@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
-import { Company, Order, OrderItem } from '../types';
+import { Company, Order, OrderItem, Product } from '../types';
 import Card from './common/Card';
 import Input from './common/Input';
 import Button from './common/Button';
-import { TrashIcon, PlusIcon, BuildingStorefrontIcon, XMarkIcon, ClipboardDocumentListIcon } from './Icons';
+import { TrashIcon, PlusIcon, BuildingStorefrontIcon, XMarkIcon, ClipboardDocumentListIcon, CalendarDaysIcon } from './Icons';
+import RecurringOrderModal from './RecurringOrderModal';
 
 // Modal for adding a new order
-const OrderModal = ({ onSave, onClose }: { onSave: (order: Omit<Order, 'id'>) => void, onClose: () => void }) => {
+const OrderModal = ({ availableProducts, onSave, onClose }: { availableProducts: Product[], onSave: (order: Omit<Order, 'id'>) => void, onClose: () => void }) => {
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [items, setItems] = useState<Omit<OrderItem, 'id'>[]>([{ productName: '', quantity: 1 }]);
 
@@ -53,7 +54,21 @@ const OrderModal = ({ onSave, onClose }: { onSave: (order: Omit<Order, 'id'>) =>
               {items.map((item, index) => (
                 <div key={index} className="flex items-end gap-2 p-3 bg-orange-50/50 rounded-md border border-orange-100">
                   <div className="flex-grow">
-                    <Input label={`Produto ${index + 1}`} name="productName" value={item.productName} onChange={(e) => handleItemChange(index, 'productName', e.target.value)} required />
+                     <label htmlFor={`product-select-${index}`} className="block text-sm font-medium text-amber-700 mb-1">
+                        Produto {index + 1}
+                    </label>
+                    <select
+                        id={`product-select-${index}`}
+                        value={item.productName}
+                        onChange={(e) => handleItemChange(index, 'productName', e.target.value)}
+                        required
+                        className="w-full px-4 py-2 bg-white border border-orange-200 rounded-md shadow-sm focus:ring-orange-500 focus:border-orange-500 transition-colors"
+                    >
+                        <option value="" disabled>Selecione um produto</option>
+                        {availableProducts.map(p => (
+                            <option key={p.id} value={p.name}>{p.name}</option>
+                        ))}
+                    </select>
                   </div>
                   <div className="w-24">
                     <Input label="Qtd." name="quantity" type="number" min="1" value={item.quantity} onChange={(e) => handleItemChange(index, 'quantity', e.target.value)} required />
@@ -88,23 +103,38 @@ const statusColors: Record<Order['status'], string> = {
 interface OrderManagementProps {
   companies: Company[];
   selectedCompany: Company | null;
+  products: Product[];
   onSelectCompany: (companyId: string) => void;
   onAddOrder: (order: Omit<Order, 'id'>) => void;
   onDeleteOrder: (orderId: string) => void;
   onUpdateOrderStatus: (orderId: string, status: Order['status']) => void;
 }
 
-const OrderManagement: React.FC<OrderManagementProps> = ({ companies, selectedCompany, onSelectCompany, onAddOrder, onDeleteOrder, onUpdateOrderStatus }) => {
+const OrderManagement: React.FC<OrderManagementProps> = ({ companies, selectedCompany, products, onSelectCompany, onAddOrder, onDeleteOrder, onUpdateOrderStatus }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isRecurringModalOpen, setIsRecurringModalOpen] = useState(false);
 
   const handleSaveOrder = (order: Omit<Order, 'id'>) => {
     onAddOrder(order);
     setIsModalOpen(false);
   };
+
+  const handleSaveRecurringOrder = (data: { items: Omit<OrderItem, 'id'>[], recurrence: any }) => {
+    console.log("Saving recurring order:", data);
+    // Here you would typically save the recurring order rule to your state or backend.
+    setIsRecurringModalOpen(false);
+  };
   
+  const availableProductsForCompany = selectedCompany
+    ? products.filter(p => 
+        selectedCompany.productSettings?.some(s => s.productId === p.id && s.buys)
+      )
+    : [];
+
   return (
     <div className="space-y-8">
-      {isModalOpen && <OrderModal onSave={handleSaveOrder} onClose={() => setIsModalOpen(false)} />}
+      {isModalOpen && <OrderModal availableProducts={availableProductsForCompany} onSave={handleSaveOrder} onClose={() => setIsModalOpen(false)} />}
+      {isRecurringModalOpen && <RecurringOrderModal availableProducts={availableProductsForCompany} onSave={handleSaveRecurringOrder} onClose={() => setIsRecurringModalOpen(false)} />}
       <Card>
         <div className="p-6 flex flex-col sm:flex-row justify-between sm:items-end gap-4">
           <div>
@@ -124,10 +154,16 @@ const OrderManagement: React.FC<OrderManagementProps> = ({ companies, selectedCo
             </select>
           </div>
           {selectedCompany && (
-            <Button onClick={() => setIsModalOpen(true)}>
-              <PlusIcon className="h-5 w-5 mr-2" />
-              Adicionar Pedido
-            </Button>
+            <div className="flex flex-col sm:flex-row gap-2">
+                <Button variant="secondary" onClick={() => setIsRecurringModalOpen(true)}>
+                    <CalendarDaysIcon className="h-5 w-5 mr-2" />
+                    Definir Pedido Recorrente
+                </Button>
+                <Button onClick={() => setIsModalOpen(true)}>
+                    <PlusIcon className="h-5 w-5 mr-2" />
+                    Adicionar Pedido
+                </Button>
+            </div>
           )}
         </div>
       </Card>

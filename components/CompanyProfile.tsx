@@ -1,33 +1,55 @@
 import React, { useState } from 'react';
-import { Company, Order } from '../types';
+import { Company } from '../types';
 import Card from './common/Card';
 import Input from './common/Input';
 import Button from './common/Button';
 import { TrashIcon, BuildingStorefrontIcon, PencilIcon, PlusIcon, XMarkIcon } from './Icons';
 
-// Modal Component
-const CompanyModal = ({ company, onSave, onClose }: { company: Partial<Company> | null, onSave: (company: Omit<Company, 'id' | 'orders'> | Company) => void, onClose: () => void }) => {
-  if (!company) return null;
-
+// Modal Component for Adding a new Company
+// FIX: Removed 'financials' from Omit type to match the expected type in App.tsx.
+const CompanyModal = ({ onSave, onClose }: { onSave: (company: Omit<Company, 'id' | 'orders'>) => void, onClose: () => void }) => {
+  
   const [formData, setFormData] = useState({
-    name: company.name || '',
-    cnpj: company.cnpj || '',
-    address: company.address || '',
-    phone: company.phone || '',
-    logoUrl: company.logoUrl || `https://picsum.photos/seed/${Date.now()}/200`,
+    name: '',
+    cnpj: '',
+    address: '',
+    cep: '',
+    phone: '',
+    logoUrl: `https://picsum.photos/seed/${Date.now()}/200`,
   });
+  const [isLoadingCep, setIsLoadingCep] = useState(false);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
   };
+
+  const handleCepBlur = async (e: React.FocusEvent<HTMLInputElement>) => {
+    const cep = e.target.value.replace(/\D/g, '');
+    if (cep.length !== 8) return;
+    setIsLoadingCep(true);
+    try {
+      const response = await fetch(`https://viacep.com.br/ws/${cep}/json/`);
+      if (!response.ok) throw new Error('Erro ao consultar a API de CEP.');
+      const data = await response.json();
+      if (data.erro) {
+        setFormData(prev => ({ ...prev, address: '' }));
+      } else {
+        const fullAddress = [data.logradouro, data.bairro, data.localidade, data.uf].filter(Boolean).join(', ');
+        setFormData(prev => ({ ...prev, address: fullAddress }));
+      }
+    } catch (error) {
+      console.error('Falha ao buscar CEP:', error);
+    } finally {
+      setIsLoadingCep(false);
+    }
+  };
+
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const finalData = { ...company, ...formData };
-    onSave(finalData);
+    onSave(formData);
   };
-
-  const isEditing = 'id' in company && company.id;
 
   return (
     <div className="fixed inset-0 bg-black/50 z-40 flex items-center justify-center p-4 animate-fade-in" role="dialog" aria-modal="true">
@@ -36,16 +58,29 @@ const CompanyModal = ({ company, onSave, onClose }: { company: Partial<Company> 
           <XMarkIcon className="h-6 w-6" />
         </button>
         <form onSubmit={handleSubmit} className="p-8">
-          <h3 className="text-xl font-semibold text-amber-800 mb-6">{isEditing ? 'Editar Empresa' : 'Adicionar Nova Empresa'}</h3>
+          <h3 className="text-xl font-semibold text-amber-800 mb-6">Adicionar Nova Empresa</h3>
+          
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <Input label="Nome da Empresa" name="name" value={formData.name} onChange={handleChange} required />
             <Input label="CNPJ" name="cnpj" value={formData.cnpj} onChange={handleChange} required />
-            <Input label="Endereço" name="address" value={formData.address} onChange={handleChange} required />
+            <Input label="CEP" name="cep" value={formData.cep} onChange={handleChange} onBlur={handleCepBlur} required />
             <Input label="Telefone" name="phone" value={formData.phone} onChange={handleChange} required />
+            <div className="md:col-span-2">
+                <Input 
+                    label={isLoadingCep ? "Buscando endereço..." : "Endereço"} 
+                    name="address" 
+                    value={formData.address} 
+                    onChange={handleChange} 
+                    required 
+                    disabled={isLoadingCep}
+                    placeholder={isLoadingCep ? "Aguarde..." : "Preenchido automaticamente pelo CEP"}
+                />
+            </div>
           </div>
+
           <div className="mt-8 flex justify-end gap-4">
             <Button type="button" variant="secondary" onClick={onClose}>Cancelar</Button>
-            <Button type="submit">{isEditing ? 'Salvar Alterações' : 'Adicionar Empresa'}</Button>
+            <Button type="submit">Adicionar Empresa</Button>
           </div>
         </form>
       </Card>
@@ -55,27 +90,26 @@ const CompanyModal = ({ company, onSave, onClose }: { company: Partial<Company> 
 
 interface CompanyManagementProps {
   companies: Company[];
+  // FIX: Removed 'financials' from Omit type to match handleAddCompany in App.tsx.
   onAdd: (company: Omit<Company, 'id' | 'orders'>) => void;
   onUpdate: (company: Company) => void;
   onDelete: (companyId: string) => void;
+  onViewCompany: (companyId: string) => void;
 }
 
-const CompanyManagement: React.FC<CompanyManagementProps> = ({ companies, onAdd, onUpdate, onDelete }) => {
-  const [modalCompany, setModalCompany] = useState<Partial<Company> | null>(null);
+const CompanyManagement: React.FC<CompanyManagementProps> = ({ companies, onAdd, onUpdate, onDelete, onViewCompany }) => {
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
 
-  const handleSave = (companyData: Omit<Company, 'id' | 'orders'> | Company) => {
-    if ('id' in companyData && companyData.id) {
-        onUpdate(companyData as Company);
-    } else {
-        onAdd(companyData as Omit<Company, 'id' | 'orders'>);
-    }
-    setModalCompany(null);
+  // FIX: Removed 'financials' from Omit type to align with the prop type change.
+  const handleSave = (companyData: Omit<Company, 'id' | 'orders'>) => {
+    onAdd(companyData);
+    setIsAddModalOpen(false);
   };
   
   return (
     <div className="space-y-8">
       <div className="flex justify-end">
-        <Button onClick={() => setModalCompany({})}>
+        <Button onClick={() => setIsAddModalOpen(true)}>
           <PlusIcon className="h-5 w-5 mr-2" />
           Adicionar Empresa
         </Button>
@@ -85,7 +119,7 @@ const CompanyManagement: React.FC<CompanyManagementProps> = ({ companies, onAdd,
         <Card className="p-0">
           <ul className="divide-y divide-orange-100">
             {companies.map(company => (
-              <li key={company.id} className="p-4 flex items-start sm:items-center justify-between hover:bg-orange-50/50 transition-colors flex-col sm:flex-row gap-4">
+              <li key={company.id} className="p-4 flex items-start sm:items-center justify-between hover:bg-orange-50/50 transition-colors flex-col sm:flex-row gap-4 cursor-pointer" onClick={() => onViewCompany(company.id)}>
                 <div className="flex items-center gap-4 flex-1 min-w-0">
                   <img src={company.logoUrl} alt={`Logo de ${company.name}`} className="h-16 w-16 rounded-full object-cover flex-shrink-0" />
                   <div className="min-w-0">
@@ -98,10 +132,7 @@ const CompanyManagement: React.FC<CompanyManagementProps> = ({ companies, onAdd,
                   </div>
                 </div>
                 <div className="flex gap-2 self-end sm:self-center">
-                  <button onClick={() => setModalCompany(company)} className="text-blue-500 hover:text-blue-700 p-2 rounded-full hover:bg-blue-100 transition-colors" aria-label="Editar Empresa">
-                      <PencilIcon className="h-5 w-5" />
-                  </button>
-                  <button onClick={() => onDelete(company.id)} className="text-red-500 hover:text-red-700 p-2 rounded-full hover:bg-red-100 transition-colors" aria-label="Deletar Empresa">
+                  <button onClick={(e) => { e.stopPropagation(); onDelete(company.id); }} className="text-red-500 hover:text-red-700 p-2 rounded-full hover:bg-red-100 transition-colors" aria-label="Deletar Empresa">
                       <TrashIcon className="h-5 w-5" />
                   </button>
                 </div>
@@ -117,7 +148,7 @@ const CompanyManagement: React.FC<CompanyManagementProps> = ({ companies, onAdd,
          </Card>
       )}
 
-      {modalCompany && <CompanyModal company={modalCompany} onSave={handleSave} onClose={() => setModalCompany(null)} />}
+      {isAddModalOpen && <CompanyModal onSave={handleSave} onClose={() => setIsAddModalOpen(false)} />}
     </div>
   );
 };

@@ -1,7 +1,7 @@
 import React from 'react';
-import { BuildingStorefrontIcon, UsersIcon, Bars3Icon, XMarkIcon, ArrowRightOnRectangleIcon, ClipboardDocumentListIcon } from './Icons';
+import { BuildingStorefrontIcon, UsersIcon, Bars3Icon, XMarkIcon, ArrowRightOnRectangleIcon, ClipboardDocumentListIcon, TagIcon } from './Icons';
 
-type View = 'companies' | 'employees' | 'orders';
+type View = 'companies' | 'employees' | 'orders' | 'products';
 
 interface SidebarProps {
   currentView: View;
@@ -16,6 +16,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setCurrentView, onLogout
     { id: 'companies', label: 'Empresas', icon: <BuildingStorefrontIcon className="h-6 w-6" /> },
     { id: 'employees', label: 'Funcionários', icon: <UsersIcon className="h-6 w-6" /> },
     { id: 'orders', label: 'Pedidos', icon: <ClipboardDocumentListIcon className="h-6 w-6" /> },
+    { id: 'products', label: 'Produtos', icon: <TagIcon className="h-6 w-6" /> },
   ];
 
   const NavContent = () => (
