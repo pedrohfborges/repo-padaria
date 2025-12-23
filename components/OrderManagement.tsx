@@ -1,6 +1,6 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Company, Order, OrderItem, Product } from '../types';
+import { Company, Order, OrderItem, Product, RecurringOrderConfig } from '../types';
 import Card from './common/Card';
 import Input from './common/Input';
 import Button from './common/Button';
@@ -220,10 +220,11 @@ interface OrderManagementProps {
   onAddOrder: (order: Omit<Order, 'id'>) => void;
   onDeleteOrder: (orderId: string) => void;
   onUpdateOrderSignature?: (orderId: string, signature: string) => void;
+  onUpdateRecurringOrder?: (companyId: string, config: RecurringOrderConfig) => void;
   isDoorSaleMode?: boolean;
 }
 
-const OrderManagement: React.FC<OrderManagementProps> = ({ companies, selectedCompany, products, onSelectCompany, onAddOrder, onDeleteOrder, onUpdateOrderSignature, isDoorSaleMode = false }) => {
+const OrderManagement: React.FC<OrderManagementProps> = ({ companies, selectedCompany, products, onSelectCompany, onAddOrder, onDeleteOrder, onUpdateOrderSignature, onUpdateRecurringOrder, isDoorSaleMode = false }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isRecurringModalOpen, setIsRecurringModalOpen] = useState(false);
   const [signatureOrderId, setSignatureOrderId] = useState<string | null>(null);
@@ -235,7 +236,10 @@ const OrderManagement: React.FC<OrderManagementProps> = ({ companies, selectedCo
   };
 
   const handleSaveRecurringOrder = (data: { items: Omit<OrderItem, 'id'>[], recurrence: any }) => {
-    console.log("Saving recurring order:", data);
+    if (selectedCompany && onUpdateRecurringOrder) {
+      onUpdateRecurringOrder(selectedCompany.id, data);
+      alert(`Agendamento ${data.recurrence.type} configurado para ${selectedCompany.name}`);
+    }
     setIsRecurringModalOpen(false);
   };
 
@@ -269,7 +273,7 @@ const OrderManagement: React.FC<OrderManagementProps> = ({ companies, selectedCo
                 id="company-select"
                 value={selectedCompany?.id || ''}
                 onChange={(e) => onSelectCompany(e.target.value)}
-                className="w-full max-w-sm px-4 py-2 bg-white border border-orange-200 rounded-md shadow-sm focus:ring-orange-500 focus:border-orange-500 transition-colors"
+                className="w-full max-sm:max-w-full max-w-sm px-4 py-2 bg-white border border-orange-200 rounded-md shadow-sm focus:ring-orange-500 focus:border-orange-500 transition-colors"
             >
                 <option value="" disabled>-- Escolha uma empresa --</option>
                 {companies.map(c => (
@@ -280,9 +284,9 @@ const OrderManagement: React.FC<OrderManagementProps> = ({ companies, selectedCo
           {selectedCompany && (
             <div className="flex flex-col sm:flex-row gap-2">
                 {!isDoorSaleMode && (
-                  <Button variant="secondary" onClick={() => setIsRecurringModalOpen(true)}>
-                      <CalendarDaysIcon className="h-5 w-5 mr-2" />
-                      Definir Pedido Recorrente
+                  <Button variant="secondary" onClick={() => setIsRecurringModalOpen(true)} className={selectedCompany.recurringOrder ? 'border-orange-500 bg-orange-50' : ''}>
+                      <CalendarDaysIcon className={`h-5 w-5 mr-2 ${selectedCompany.recurringOrder ? 'text-orange-600' : ''}`} />
+                      {selectedCompany.recurringOrder ? 'Editar Agendamento' : 'Definir Pedido Recorrente'}
                   </Button>
                 )}
                 <Button onClick={() => setIsModalOpen(true)}>
@@ -296,6 +300,26 @@ const OrderManagement: React.FC<OrderManagementProps> = ({ companies, selectedCo
     
       {selectedCompany ? (
         <div className="space-y-4">
+          {selectedCompany.recurringOrder && !isDoorSaleMode && (
+             <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 flex items-center justify-between shadow-sm animate-fade-in">
+                <div className="flex items-center gap-3">
+                    <div className="p-2 bg-amber-100 rounded-full text-amber-700">
+                        <CalendarDaysIcon className="h-5 w-5" />
+                    </div>
+                    <div>
+                        <p className="text-sm font-bold text-amber-900">Agendamento Ativo</p>
+                        <p className="text-xs text-amber-700">Pedidos são gerados automaticamente: <strong>{selectedCompany.recurringOrder.recurrence.type === 'daily' ? 'Diariamente' : selectedCompany.recurringOrder.recurrence.type === 'weekdays' ? 'Segunda a Sexta' : 'Semanalmente'}</strong></p>
+                    </div>
+                </div>
+                <button 
+                  onClick={() => setIsRecurringModalOpen(true)}
+                  className="text-xs font-bold text-amber-800 underline hover:text-amber-600"
+                >
+                  Alterar itens ou frequência
+                </button>
+             </div>
+          )}
+
           {selectedCompany.orders.length > 0 ? (
             <Card className="p-0">
               <ul className="divide-y divide-orange-100">
@@ -306,6 +330,11 @@ const OrderManagement: React.FC<OrderManagementProps> = ({ companies, selectedCo
                         <h3 className="font-bold text-lg text-amber-800">
                           Pedido de {new Date(order.date).toLocaleDateString('pt-BR', { timeZone: 'UTC', day: '2-digit', month: 'long', year: 'numeric' })}
                         </h3>
+                        {order.id.startsWith('auto') && (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-orange-100 text-orange-800">
+                            Gerado Automaticamente
+                          </span>
+                        )}
                       </div>
                       <div className="flex items-center gap-3">
                         <button 

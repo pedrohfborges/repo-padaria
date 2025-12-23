@@ -1,10 +1,11 @@
 
 import React, { useState, useEffect } from 'react';
-import { Company, Product, CompanyProductSetting } from '../types';
+import { Company, Product, CompanyProductSetting, FinancialParams, RecurringOrderConfig } from '../types';
 import { PencilIcon, ChevronLeftIcon, CheckCircleIcon } from './Icons';
 import Card from './common/Card';
 import Input from './common/Input';
 import Button from './common/Button';
+import FinancialParameters from './FinancialParameters';
 
 interface CompanyDetailViewProps {
   company: Company;
@@ -15,7 +16,18 @@ interface CompanyDetailViewProps {
 }
 
 const CompanyDetailView: React.FC<CompanyDetailViewProps> = ({ company, products, onUpdate, onUpdateProductSettings, onBack }) => {
-  const [activeTab, setActiveTab] = useState<'dadosGerais' | 'preco'>('dadosGerais');
+  const [activeTab, setActiveTab] = useState<'dadosGerais' | 'preco' | 'configuracaoCompra'>('dadosGerais');
+
+  const handleUpdateRecurringOnly = (newRecurring?: RecurringOrderConfig) => {
+    onUpdate({ 
+        ...company, 
+        recurringOrder: newRecurring 
+    });
+  };
+
+  const availableProductsForRecurrence = products.filter(p => 
+    company.productSettings?.some(s => s.productId === p.id && s.buys)
+  );
 
   return (
     <div className="animate-fade-in">
@@ -37,7 +49,7 @@ const CompanyDetailView: React.FC<CompanyDetailViewProps> = ({ company, products
               activeTab === 'dadosGerais'
                 ? 'border-orange-500 text-orange-600'
                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-            } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
+            } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors duration-200`}
           >
             Dados Gerais
           </button>
@@ -47,9 +59,19 @@ const CompanyDetailView: React.FC<CompanyDetailViewProps> = ({ company, products
               activeTab === 'preco'
                 ? 'border-orange-500 text-orange-600'
                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-            } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
+            } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors duration-200`}
           >
             Preço
+          </button>
+          <button
+            onClick={() => setActiveTab('configuracaoCompra')}
+            className={`${
+              activeTab === 'configuracaoCompra'
+                ? 'border-orange-500 text-orange-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors duration-200`}
+          >
+            Configuração de Compra
           </button>
         </nav>
       </div>
@@ -62,6 +84,14 @@ const CompanyDetailView: React.FC<CompanyDetailViewProps> = ({ company, products
                 company={company}
                 allProducts={products}
                 onUpdate={(newSettings) => onUpdateProductSettings(company.id, newSettings)}
+            />
+        )}
+        {activeTab === 'configuracaoCompra' && (
+            <FinancialParameters 
+                companyName={company.name}
+                recurringConfig={company.recurringOrder}
+                availableProducts={availableProductsForRecurrence}
+                onUpdate={handleUpdateRecurringOnly}
             />
         )}
       </div>
@@ -103,7 +133,6 @@ const ProductSettingsTab = ({ company, allProducts, onUpdate }: { company: Compa
     const handleSave = () => {
         onUpdate(settings);
         setHasChanges(false);
-        alert('Preços salvos com sucesso!');
     };
     
     const handleCancel = () => {

@@ -18,11 +18,21 @@ export interface CompanyProductSetting {
   price: number;
 }
 
-// FIX: Added FinancialParams interface to be used by FinancialParameters component and Company type.
 export interface FinancialParams {
   defaultMargin: number;
   defaultDeliveryFee: number;
   maxDiscount: number;
+}
+
+export type RecurrenceType = 'daily' | 'weekdays' | 'weekly' | 'monthly' | 'yearly' | 'custom';
+
+export interface RecurringOrderConfig {
+  items: Omit<OrderItem, 'id'>[];
+  recurrence: {
+    type: RecurrenceType;
+    interval?: number;
+    lastGeneratedDate?: string; // YYYY-MM-DD
+  };
 }
 
 export interface Company {
@@ -35,11 +45,10 @@ export interface Company {
   logoUrl: string;
   orders: Order[];
   productSettings?: CompanyProductSetting[];
-  // FIX: Added optional financials property to Company type.
   financials?: FinancialParams;
   doorSale?: boolean;
+  recurringOrder?: RecurringOrderConfig;
 }
-
 
 export interface Employee {
   id: string;
