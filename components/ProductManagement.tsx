@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Product } from '../types';
 import Card from './common/Card';
@@ -5,7 +6,7 @@ import Input from './common/Input';
 import Button from './common/Button';
 import { TrashIcon, TagIcon, PencilIcon, PlusIcon, XMarkIcon } from './Icons';
 
-// Modal Component
+// Modal Component - Minimalist Version
 const ProductModal = ({ product, onSave, onClose }: { product: Partial<Product> | null, onSave: (product: Omit<Product, 'id'> | Product) => void, onClose: () => void }) => {
   if (!product) return null;
 
@@ -24,34 +25,65 @@ const ProductModal = ({ product, onSave, onClose }: { product: Partial<Product> 
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.name || !formData.category) {
-        alert("Nome e categoria são obrigatórios.");
-        return;
-    }
+    if (!formData.name || !formData.category) return;
     const finalData = { ...product, ...formData };
-    onSave(finalData);
+    onSave(finalData as Product);
   };
 
   const isEditing = 'id' in product && product.id;
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-40 flex items-center justify-center p-4 animate-fade-in" role="dialog" aria-modal="true">
-      <Card className="w-full max-w-lg relative">
-        <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600" aria-label="Fechar">
-          <XMarkIcon className="h-6 w-6" />
+    <div className="fixed inset-0 bg-amber-900/10 z-50 flex items-center justify-center p-4 backdrop-blur-[2px] animate-fade-in" role="dialog" aria-modal="true">
+      <div className="w-full max-w-md bg-white rounded-[2.5rem] shadow-2xl shadow-amber-900/5 relative overflow-hidden border border-white">
+        <button 
+          onClick={onClose} 
+          className="absolute top-6 right-6 text-amber-200 hover:text-amber-500 transition-colors p-1" 
+          aria-label="Fechar"
+        >
+          <XMarkIcon className="h-5 w-5" />
         </button>
-        <form onSubmit={handleSubmit} className="p-8">
-          <h3 className="text-xl font-semibold text-amber-800 mb-6">{isEditing ? 'Editar Produto' : 'Adicionar Novo Produto'}</h3>
-          <div className="space-y-4">
-            <Input label="Nome do Produto" name="name" value={formData.name} onChange={handleChange} required />
-            <Input label="Categoria" name="category" value={formData.category} onChange={handleChange} required />
+        
+        <form onSubmit={handleSubmit} className="p-10">
+          <header className="mb-8">
+            <h3 className="text-xl font-medium text-amber-900 tracking-tight">
+              {isEditing ? 'Editar Produto' : 'Novo Produto'}
+            </h3>
+            <div className="h-0.5 w-8 bg-orange-400 mt-2 rounded-full"></div>
+          </header>
+
+          <div className="space-y-8">
+            <Input 
+              label="Nome do Produto" 
+              name="name" 
+              value={formData.name} 
+              onChange={handleChange} 
+              required 
+              placeholder="Ex: Pão de Sal" 
+            />
+            <Input 
+              label="Categoria" 
+              name="category" 
+              value={formData.category} 
+              onChange={handleChange} 
+              required 
+              placeholder="Ex: Padaria" 
+            />
           </div>
-          <div className="mt-8 flex justify-end gap-4">
-            <Button type="button" variant="secondary" onClick={onClose}>Cancelar</Button>
-            <Button type="submit">{isEditing ? 'Salvar Alterações' : 'Adicionar Produto'}</Button>
+
+          <div className="mt-12 flex items-center gap-3">
+            <button 
+              type="button" 
+              onClick={onClose}
+              className="flex-1 px-6 py-3.5 text-sm font-semibold text-amber-700 hover:text-amber-900 transition-colors"
+            >
+              Cancelar
+            </button>
+            <Button type="submit" className="flex-1 shadow-lg shadow-orange-500/20 py-3.5 rounded-2xl">
+              {isEditing ? 'Salvar' : 'Cadastrar'}
+            </Button>
           </div>
         </form>
-      </Card>
+      </div>
     </div>
   );
 };
@@ -76,37 +108,42 @@ const ProductManagement: React.FC<ProductManagementProps> = ({ products, onAdd, 
   };
 
   return (
-    <div className="space-y-8">
-       <div className="flex justify-end">
-        <Button onClick={() => setModalProduct({})}>
+    <div className="space-y-8 animate-fade-in max-w-5xl mx-auto">
+       <div className="flex justify-between items-center px-2">
+        <h2 className="text-lg font-medium text-amber-900/60">Catálogo de Itens</h2>
+        <Button onClick={() => setModalProduct({})} className="rounded-2xl">
           <PlusIcon className="h-5 w-5 mr-2" />
           Adicionar Produto
         </Button>
       </div>
 
+      <div className="bg-white rounded-[2rem] border border-orange-50/50 overflow-hidden shadow-sm">
       {products.length > 0 ? (
-        <Card className="p-0">
           <div className="overflow-x-auto">
             <table className="w-full text-left">
-              <thead className="border-b-2 border-orange-200">
-                <tr>
-                  <th className="p-4 text-sm font-semibold text-amber-700">Nome do Produto</th>
-                  <th className="p-4 text-sm font-semibold text-amber-700">Categoria</th>
-                  <th className="p-4 text-sm font-semibold text-amber-700 text-right">Ações</th>
+              <thead>
+                <tr className="border-b border-orange-50">
+                  <th className="p-6 text-[11px] font-bold text-amber-800/40 uppercase tracking-[0.2em]">Produto</th>
+                  <th className="p-6 text-[11px] font-bold text-amber-800/40 uppercase tracking-[0.2em]">Categoria</th>
+                  <th className="p-6 text-[11px] font-bold text-amber-800/40 uppercase tracking-[0.2em] text-right">Ações</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="divide-y divide-orange-50/30">
                 {products.map(product => (
-                  <tr key={product.id} className="border-b border-orange-100 hover:bg-orange-50/50">
-                    <td className="p-4 font-medium text-gray-800">{product.name}</td>
-                    <td className="p-4 text-gray-600">{product.category}</td>
-                    <td className="p-4 text-right">
-                       <div className="flex gap-2 justify-end">
-                          <button onClick={() => setModalProduct(product)} className="text-blue-500 hover:text-blue-700 p-2 rounded-full hover:bg-blue-100 transition-colors" aria-label="Editar Produto">
-                              <PencilIcon className="h-5 w-5" />
+                  <tr key={product.id} className="hover:bg-orange-50/20 transition-colors group">
+                    <td className="p-6 font-semibold text-amber-900">{product.name}</td>
+                    <td className="p-6">
+                      <span className="text-amber-700/60 text-sm bg-amber-50/50 px-3 py-1 rounded-full border border-amber-100/50">
+                        {product.category}
+                      </span>
+                    </td>
+                    <td className="p-6 text-right">
+                       <div className="flex gap-2 justify-end opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button onClick={() => setModalProduct(product)} className="text-amber-400 hover:text-amber-600 p-2.5 rounded-xl hover:bg-white transition-all shadow-sm border border-transparent hover:border-orange-100" aria-label="Editar Produto">
+                              <PencilIcon className="h-4 w-4" />
                           </button>
-                          <button onClick={() => onDelete(product.id)} className="text-red-500 hover:text-red-700 p-2 rounded-full hover:bg-red-100 transition-colors" aria-label="Deletar Produto">
-                              <TrashIcon className="h-5 w-5" />
+                          <button onClick={() => onDelete(product.id)} className="text-red-200 hover:text-red-400 p-2.5 rounded-xl hover:bg-white transition-all shadow-sm border border-transparent hover:border-red-50" aria-label="Deletar Produto">
+                              <TrashIcon className="h-4 w-4" />
                           </button>
                         </div>
                     </td>
@@ -115,14 +152,13 @@ const ProductManagement: React.FC<ProductManagementProps> = ({ products, onAdd, 
               </tbody>
             </table>
           </div>
-        </Card>
       ) : (
-         <Card className="text-center p-12">
-            <TagIcon className="mx-auto h-12 w-12 text-gray-400" />
-            <h3 className="mt-2 text-lg font-medium text-gray-900">Nenhum produto cadastrado</h3>
-            <p className="mt-1 text-sm text-gray-500">Comece adicionando seu primeiro produto ao catálogo.</p>
-         </Card>
+         <div className="text-center py-32 bg-white">
+            <TagIcon className="mx-auto h-12 w-12 text-amber-50" />
+            <h3 className="mt-6 text-sm font-medium text-amber-300 uppercase tracking-widest">Nenhum produto listado</h3>
+         </div>
       )}
+      </div>
 
       {modalProduct && <ProductModal product={modalProduct} onSave={handleSave} onClose={() => setModalProduct(null)} />}
     </div>
