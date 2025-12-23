@@ -18,6 +18,13 @@ interface CompanyDetailViewProps {
 const CompanyDetailView: React.FC<CompanyDetailViewProps> = ({ company, products, onUpdate, onUpdateProductSettings, onBack }) => {
   const [activeTab, setActiveTab] = useState<'dadosGerais' | 'preco' | 'configuracaoCompra'>('dadosGerais');
 
+  // Ajusta tab ativa se o agendamento for desativado
+  useEffect(() => {
+    if (!company.orderScheduling && activeTab === 'configuracaoCompra') {
+      setActiveTab('dadosGerais');
+    }
+  }, [company.orderScheduling, activeTab]);
+
   const handleUpdateRecurringOnly = (newRecurring?: RecurringOrderConfig) => {
     onUpdate({ 
         ...company, 
@@ -63,16 +70,20 @@ const CompanyDetailView: React.FC<CompanyDetailViewProps> = ({ company, products
           >
             Preço
           </button>
-          <button
-            onClick={() => setActiveTab('configuracaoCompra')}
-            className={`${
-              activeTab === 'configuracaoCompra'
-                ? 'border-orange-500 text-orange-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-            } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors duration-200`}
-          >
-            Configuração de Compra
-          </button>
+          
+          {/* Exibe Configuração de Compra apenas se Agendamento estiver ativo */}
+          {company.orderScheduling && (
+            <button
+              onClick={() => setActiveTab('configuracaoCompra')}
+              className={`${
+                activeTab === 'configuracaoCompra'
+                  ? 'border-orange-500 text-orange-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors duration-200`}
+            >
+              Agendamento de Pedidos
+            </button>
+          )}
         </nav>
       </div>
 
@@ -86,7 +97,7 @@ const CompanyDetailView: React.FC<CompanyDetailViewProps> = ({ company, products
                 onUpdate={(newSettings) => onUpdateProductSettings(company.id, newSettings)}
             />
         )}
-        {activeTab === 'configuracaoCompra' && (
+        {activeTab === 'configuracaoCompra' && company.orderScheduling && (
             <FinancialParameters 
                 companyName={company.name}
                 recurringConfig={company.recurringOrder}
@@ -268,7 +279,7 @@ const GeneralDataTab = ({ company, onUpdate }: { company: Company, onUpdate: (c:
         
         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
             <InfoField label="Nome da Empresa" value={formData.name} name="name" isEditing={isEditing} onChange={handleChange} />
-            <InfoField label="CNPJ" value={formData.cnpj} name="cnpj" isEditing={isEditing} onChange={handleChange} />
+            <InfoField label="CNPJ" value={formData.cnpj} name="cnpj" isEditing={isEditing} onChange={handleChange} onBlur={handleCepBlur} />
             <InfoField label="CEP" value={formData.cep} name="cep" isEditing={isEditing} onChange={handleChange} onBlur={handleCepBlur} />
             <InfoField label="Telefone" value={formData.phone} name="phone" isEditing={isEditing} onChange={handleChange} />
             <div className="md:col-span-2">
@@ -282,34 +293,68 @@ const GeneralDataTab = ({ company, onUpdate }: { company: Company, onUpdate: (c:
                   placeholder={isLoadingCep ? "Aguarde..." : "Preenchido automaticamente pelo CEP"}
                />
             </div>
-            <div className="md:col-span-2 mt-2">
-                {isEditing ? (
-                    <div className="flex items-center gap-2">
-                        <input 
-                            type="checkbox" 
-                            id="doorSale" 
-                            name="doorSale" 
-                            checked={formData.doorSale} 
-                            onChange={handleChange}
-                            className="h-5 w-5 rounded border-orange-300 text-orange-600 focus:ring-orange-500 cursor-pointer"
-                        />
-                        <label htmlFor="doorSale" className="text-sm font-medium text-amber-700 cursor-pointer">Venda na porta</label>
-                    </div>
-                ) : (
-                    <div>
-                        <p className="block text-sm font-medium text-amber-700 mb-1">Venda na porta</p>
-                        <div className="flex items-center gap-2 text-gray-800 bg-gray-100/50 px-4 py-2 rounded-md min-h-[42px]">
-                            {formData.doorSale ? (
-                                <span className="flex items-center gap-1 text-green-700 font-bold text-sm">
-                                    <CheckCircleIcon className="h-5 w-5" />
-                                    Sim
-                                </span>
-                            ) : (
-                                <span className="text-gray-500 text-sm italic">Não</span>
-                            )}
+            
+            {/* Boxes de Opções (Venda na Porta e Agendamento) */}
+            <div className="md:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-6 mt-2">
+                <div>
+                    {isEditing ? (
+                        <div className="flex items-center gap-2 h-[42px]">
+                            <input 
+                                type="checkbox" 
+                                id="doorSale" 
+                                name="doorSale" 
+                                checked={formData.doorSale} 
+                                onChange={handleChange}
+                                className="h-5 w-5 rounded border-orange-300 text-orange-600 focus:ring-orange-500 cursor-pointer"
+                            />
+                            <label htmlFor="doorSale" className="text-sm font-medium text-amber-700 cursor-pointer">Venda na porta</label>
                         </div>
-                    </div>
-                )}
+                    ) : (
+                        <div>
+                            <p className="block text-sm font-medium text-amber-700 mb-1">Venda na porta</p>
+                            <div className="flex items-center gap-2 text-gray-800 bg-gray-100/50 px-4 py-2 rounded-md min-h-[42px]">
+                                {formData.doorSale ? (
+                                    <span className="flex items-center gap-1 text-green-700 font-bold text-sm">
+                                        <CheckCircleIcon className="h-5 w-5" />
+                                        Sim
+                                    </span>
+                                ) : (
+                                    <span className="text-gray-500 text-sm italic">Não</span>
+                                )}
+                            </div>
+                        </div>
+                    )}
+                </div>
+
+                <div>
+                    {isEditing ? (
+                        <div className="flex items-center gap-2 h-[42px]">
+                            <input 
+                                type="checkbox" 
+                                id="orderScheduling" 
+                                name="orderScheduling" 
+                                checked={formData.orderScheduling} 
+                                onChange={handleChange}
+                                className="h-5 w-5 rounded border-orange-300 text-orange-600 focus:ring-orange-500 cursor-pointer"
+                            />
+                            <label htmlFor="orderScheduling" className="text-sm font-medium text-amber-700 cursor-pointer">Agendamento de pedidos</label>
+                        </div>
+                    ) : (
+                        <div>
+                            <p className="block text-sm font-medium text-amber-700 mb-1">Agendamento de pedidos</p>
+                            <div className="flex items-center gap-2 text-gray-800 bg-gray-100/50 px-4 py-2 rounded-md min-h-[42px]">
+                                {formData.orderScheduling ? (
+                                    <span className="flex items-center gap-1 text-green-700 font-bold text-sm">
+                                        <CheckCircleIcon className="h-5 w-5" />
+                                        Sim
+                                    </span>
+                                ) : (
+                                    <span className="text-gray-500 text-sm italic">Não</span>
+                                )}
+                            </div>
+                        </div>
+                    )}
+                </div>
             </div>
         </div>
 

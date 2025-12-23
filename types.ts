@@ -10,6 +10,8 @@ export interface Order {
   date: string; // YYYY-MM-DD
   items: OrderItem[];
   signature?: string; // Base64 encoded image string
+  status?: 'pending' | 'confirmed';
+  isDoorSale?: boolean; // Novo campo para identificar vendas na porta
 }
 
 export interface CompanyProductSetting {
@@ -24,12 +26,13 @@ export interface FinancialParams {
   maxDiscount: number;
 }
 
-export type RecurrenceType = 'daily' | 'weekdays' | 'weekly' | 'monthly' | 'yearly' | 'custom';
+export type RecurrenceType = 'daily' | 'weekdays' | 'weekly' | 'custom';
 
 export interface RecurringOrderConfig {
   items: Omit<OrderItem, 'id'>[];
   recurrence: {
     type: RecurrenceType;
+    daysOfWeek?: number[]; // 0=Dom, 1=Seg, ..., 6=Sab
     interval?: number;
     lastGeneratedDate?: string; // YYYY-MM-DD
   };
@@ -47,6 +50,7 @@ export interface Company {
   productSettings?: CompanyProductSetting[];
   financials?: FinancialParams;
   doorSale?: boolean;
+  orderScheduling?: boolean; // Novo campo
   recurringOrder?: RecurringOrderConfig;
 }
 

@@ -4,13 +4,14 @@ import { Company, Employee, Order, Product, CompanyProductSetting, RecurringOrde
 import Sidebar from './components/Sidebar';
 import CompanyManagement from './components/CompanyProfile';
 import EmployeeManagement from './components/EmployeeManagement';
-import { BuildingStorefrontIcon, UsersIcon, ClipboardDocumentListIcon, TagIcon, ShoppingBagIcon } from './components/Icons';
+import { BuildingStorefrontIcon, UsersIcon, ClipboardDocumentListIcon, TagIcon, ShoppingBagIcon, CheckCircleIcon } from './components/Icons';
 import LoginPage from './components/LoginPage';
 import OrderManagement from './components/OrderManagement';
 import ProductManagement from './components/ProductManagement';
 import CompanyDetailView from './components/CompanyDetailView';
+import ScheduledConfirmation from './components/ScheduledConfirmation';
 
-type View = 'companies' | 'employees' | 'orders' | 'door-sales' | 'products';
+type View = 'companies' | 'employees' | 'orders' | 'door-sales' | 'products' | 'scheduled-confirmation';
 
 const loadFromLocalStorage = <T,>(key: string, defaultValue: T): T => {
     try {
@@ -55,52 +56,41 @@ const App: React.FC = () => {
   useEffect(() => { saveToLocalStorage('employees', employees); }, [employees]);
   useEffect(() => { saveToLocalStorage('products', products); }, [products]);
 
-  // Lógica de Geração Automática de Pedidos Recorrentes
-  useEffect(() => {
-    if (isAuthenticated) {
-      const todayStr = new Date().toISOString().split('T')[0];
-      const todayDay = new Date().getDay(); // 0 (Dom) a 6 (Sab)
-      
-      setCompanies(prevCompanies => prevCompanies.map(company => {
-        if (!company.recurringOrder) return company;
+  // Função Unificada para Confirmar Toda a Fila
+  const handleConfirmAllQueue = (data: { drafts: any[], existing: any[] }) => {
+    setCompanies(prev => {
+      const updated = prev.map(c => {
+        let companyOrders = [...c.orders];
         
-        const { recurrence, items } = company.recurringOrder;
-        
-        // Verifica se já gerou hoje para evitar duplicatas
-        const alreadyGeneratedToday = company.orders.some(o => o.date === todayStr);
-        if (alreadyGeneratedToday) return company;
-
-        let shouldGenerate = false;
-        switch (recurrence.type) {
-          case 'daily': 
-            shouldGenerate = true; 
-            break;
-          case 'weekdays': 
-            shouldGenerate = todayDay >= 1 && todayDay <= 5; 
-            break;
-          case 'weekly':
-            // Se for o mesmo dia da semana configurado inicialmente (simulação)
-            shouldGenerate = true; 
-            break;
-          default: 
-            shouldGenerate = false;
+        // 1. Confirmar pedidos pendentes existentes
+        const existingForThisCompany = data.existing.filter(e => e.companyId === c.id);
+        if (existingForThisCompany.length > 0) {
+          const idsToConfirm = existingForThisCompany.map(e => e.orderId);
+          companyOrders = companyOrders.map(o => 
+            idsToConfirm.includes(o.id) ? { ...o, status: 'confirmed' as const } : o
+          );
         }
 
-        if (shouldGenerate) {
-          const newOrder: Order = {
-            id: `auto-${Date.now()}-${company.id}`,
-            date: todayStr,
-            items: items.map((it, idx) => ({ ...it, id: `item-auto-${idx}-${Date.now()}` }))
-          };
-          return {
-            ...company,
-            orders: [newOrder, ...company.orders]
-          };
+        // 2. Oficializar previsões (drafts) como pedidos confirmados
+        const draftsForThisCompany = data.drafts.filter(d => d.companyId === c.id);
+        if (draftsForThisCompany.length > 0) {
+          const newConfirmedOrders: Order[] = draftsForThisCompany.map(d => ({
+            ...d.order,
+            id: `ord-conf-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+            status: 'confirmed' as const
+          }));
+          companyOrders = [...newConfirmedOrders, ...companyOrders];
         }
-        return company;
-      }));
-    }
-  }, [isAuthenticated]);
+
+        return { ...c, orders: companyOrders };
+      });
+      return updated;
+    });
+    
+    // Feedback de sucesso
+    const total = data.drafts.length + data.existing.length;
+    alert(`Sucesso! ${total} pedido(s) foram confirmados e enviados para o histórico.`);
+  };
 
   const handleUpdateRecurringOrder = (companyId: string, config: RecurringOrderConfig) => {
     setCompanies(prev => prev.map(c => c.id === companyId ? { ...c, recurringOrder: config } : c));
@@ -119,7 +109,7 @@ const App: React.FC = () => {
   const handleSetCurrentView = (view: View) => {
     setCurrentView(view);
     setViewingCompanyId(null);
-    const filtered = view === 'orders' ? companies.filter(c => !c.doorSale) : view === 'door-sales' ? companies.filter(c => c.doorSale) : companies;
+    const filtered = view === 'door-sales' ? companies.filter(c => c.doorSale) : companies; 
     setSelectedCompanyId(filtered.length > 0 ? filtered[0].id : null);
   }
 
@@ -138,20 +128,27 @@ const App: React.FC = () => {
     if (selectedCompanyId === companyId) setSelectedCompanyId(remaining.length > 0 ? remaining[0].id : null);
   };
 
-  const handleAddOrder = (newOrderData: Omit<Order, 'id'>) => {
-    if (!selectedCompanyId) return;
+  const handleAddOrder = (newOrderData: Omit<Order, 'id'>, companyId?: string) => {
+    const targetId = companyId || selectedCompanyId;
+    if (!targetId) return;
     setCompanies(prev => prev.map(c => {
-      if (c.id === selectedCompanyId) {
-        const newOrder: Order = { ...newOrderData, id: `order-${Date.now()}` };
+      if (c.id === targetId) {
+        // Se já tiver status definido (ex: 'confirmed' da venda na porta), mantém. Senão, 'pending'.
+        const newOrder: Order = { 
+          ...newOrderData, 
+          id: `order-manual-${Date.now()}`, 
+          status: newOrderData.status || ('pending' as const) 
+        };
         return { ...c, orders: [newOrder, ...c.orders].sort((a, b) => b.date.localeCompare(a.date)) };
       }
       return c;
     }));
   };
 
-  const handleDeleteOrder = (orderId: string) => {
-    if (!selectedCompanyId) return;
-    setCompanies(prev => prev.map(c => c.id === selectedCompanyId ? { ...c, orders: c.orders.filter(o => o.id !== orderId) } : c));
+  const handleDeleteOrder = (orderId: string, companyId?: string) => {
+    const targetId = companyId || selectedCompanyId;
+    if (!targetId) return;
+    setCompanies(prev => prev.map(c => c.id === targetId ? { ...c, orders: c.orders.filter(o => o.id !== orderId) } : c));
   };
 
   const handleUpdateOrderSignature = (orderId: string, signature: string) => {
@@ -170,8 +167,9 @@ const App: React.FC = () => {
     switch (currentView) {
       case 'companies': return <CompanyManagement companies={companies} onAdd={handleAddCompany} onUpdate={handleUpdateCompany} onDelete={handleDeleteCompany} onViewCompany={setViewingCompanyId} />;
       case 'employees': return <EmployeeManagement employees={employees} onAddEmployee={(e) => setEmployees(prev => [...prev, { ...e, id: `emp-${Date.now()}`, status: 'Ativo' }])} onDeleteEmployee={(id) => setEmployees(prev => prev.filter(e => e.id !== id))} onUpdateEmployeeStatus={(id, s) => setEmployees(prev => prev.map(e => e.id === id ? { ...e, status: s } : e))} />;
-      case 'orders': return <OrderManagement companies={companies.filter(c => !c.doorSale)} selectedCompany={selectedCompany} products={products} onSelectCompany={setSelectedCompanyId} onAddOrder={handleAddOrder} onDeleteOrder={handleDeleteOrder} onUpdateOrderSignature={handleUpdateOrderSignature} onUpdateRecurringOrder={handleUpdateRecurringOrder} isDoorSaleMode={false} />;
-      case 'door-sales': return <OrderManagement companies={companies.filter(c => c.doorSale)} selectedCompany={selectedCompany} products={products} onSelectCompany={setSelectedCompanyId} onAddOrder={handleAddOrder} onDeleteOrder={handleDeleteOrder} onUpdateOrderSignature={handleUpdateOrderSignature} isDoorSaleMode={true} />;
+      case 'scheduled-confirmation': return <ScheduledConfirmation companies={companies} products={products} onConfirmAllQueue={handleConfirmAllQueue} onDeleteOrder={handleDeleteOrder} onAddManualOrder={handleAddOrder} />;
+      case 'orders': return <OrderManagement companies={companies} selectedCompany={selectedCompany} products={products} onSelectCompany={setSelectedCompanyId} onAddOrder={handleAddOrder} onDeleteOrder={(id) => handleDeleteOrder(id)} onUpdateOrderSignature={handleUpdateOrderSignature} onUpdateRecurringOrder={handleUpdateRecurringOrder} isDoorSaleMode={false} />;
+      case 'door-sales': return <OrderManagement companies={companies.filter(c => c.doorSale)} selectedCompany={selectedCompany} products={products} onSelectCompany={setSelectedCompanyId} onAddOrder={handleAddOrder} onDeleteOrder={(id) => handleDeleteOrder(id)} onUpdateOrderSignature={handleUpdateOrderSignature} isDoorSaleMode={true} />;
       case 'products': return <ProductManagement products={products} onAdd={(p) => setProducts(prev => [...prev, { ...p, id: `prod-${Date.now()}` }])} onUpdate={(p) => setProducts(prev => prev.map(prod => prod.id === p.id ? p : prod))} onDelete={(id) => setProducts(prev => prev.filter(p => p.id !== id))} />;
       default: return null;
     }
@@ -182,7 +180,8 @@ const App: React.FC = () => {
   const headerInfo = {
     companies: { icon: <BuildingStorefrontIcon className="h-8 w-8 text-orange-500" />, title: 'Gerenciamento de Empresas', subtitle: 'Adicione, visualize e edite as informações das suas empresas clientes.' },
     employees: { icon: <UsersIcon className="h-8 w-8 text-orange-500" />, title: 'Gerenciamento de Funcionários', subtitle: 'Gerencie a equipe da Engenho do Pão.' },
-    orders: { icon: <ClipboardDocumentListIcon className="h-8 w-8 text-orange-500" />, title: 'Gerenciamento de Pedidos', subtitle: 'Registre e acompanhe os pedidos diários de clientes regulares.' },
+    'scheduled-confirmation': { icon: <CheckCircleIcon className="h-8 w-8 text-orange-500" />, title: 'Fila de Produção & Confirmação', subtitle: 'Gerencie todos os pedidos aguardando confirmação (agendados e manuais).' },
+    orders: { icon: <ClipboardDocumentListIcon className="h-8 w-8 text-orange-500" />, title: 'Histórico de pedidos', subtitle: 'Acompanhe o registro histórico de pedidos de todos os clientes.' },
     'door-sales': { icon: <ShoppingBagIcon className="h-8 w-8 text-orange-500" />, title: 'Venda na Porta', subtitle: 'Gerencie pedidos específicos de venda na porta.' },
     products: { icon: <TagIcon className="h-8 w-8 text-orange-500" />, title: 'Gerenciamento de Produtos', subtitle: 'Cadastre e organize os produtos oferecidos pela padaria.' },
   };

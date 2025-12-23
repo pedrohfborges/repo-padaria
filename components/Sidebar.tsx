@@ -1,8 +1,8 @@
 
 import React from 'react';
-import { BuildingStorefrontIcon, UsersIcon, Bars3Icon, XMarkIcon, ArrowRightOnRectangleIcon, ClipboardDocumentListIcon, TagIcon, ShoppingBagIcon } from './Icons';
+import { BuildingStorefrontIcon, UsersIcon, Bars3Icon, XMarkIcon, ArrowRightOnRectangleIcon, ClipboardDocumentListIcon, TagIcon, ShoppingBagIcon, CheckCircleIcon } from './Icons';
 
-type View = 'companies' | 'employees' | 'orders' | 'door-sales' | 'products';
+type View = 'companies' | 'employees' | 'orders' | 'door-sales' | 'products' | 'scheduled-confirmation';
 
 interface SidebarProps {
   currentView: View;
@@ -16,7 +16,8 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setCurrentView, onLogout
   const navItems = [
     { id: 'companies', label: 'Empresas', icon: <BuildingStorefrontIcon className="h-6 w-6" /> },
     { id: 'employees', label: 'Funcionários', icon: <UsersIcon className="h-6 w-6" /> },
-    { id: 'orders', label: 'Pedidos', icon: <ClipboardDocumentListIcon className="h-6 w-6" /> },
+    { id: 'scheduled-confirmation', label: 'Confirmar pedidos agendados', icon: <CheckCircleIcon className="h-6 w-6" /> },
+    { id: 'orders', label: 'Histórico de pedidos', icon: <ClipboardDocumentListIcon className="h-6 w-6" /> },
     { id: 'door-sales', label: 'Venda na Porta', icon: <ShoppingBagIcon className="h-6 w-6" /> },
     { id: 'products', label: 'Produtos', icon: <TagIcon className="h-6 w-6" /> },
   ];
@@ -25,9 +26,9 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setCurrentView, onLogout
      <div className="flex flex-col h-full bg-white shadow-lg">
       <div className="p-6 border-b border-orange-100 flex items-center justify-center gap-3">
         <img src="https://picsum.photos/seed/engenhodopao/40" alt="Logo Engenho do Pão" className="h-10 w-10 rounded-full"/>
-        <span className="text-xl font-bold text-amber-800">Engenho do Pão</span>
+        <span className="text-xl font-bold text-amber-800 text-center leading-tight">Engenho do Pão</span>
       </div>
-      <nav className="flex-1 px-4 py-6 space-y-2">
+      <nav className="flex-1 px-4 py-6 space-y-2 overflow-y-auto">
         {navItems.map(item => (
           <button
             key={item.id}
@@ -35,14 +36,14 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setCurrentView, onLogout
               setCurrentView(item.id as View);
               setIsOpen(false);
             }}
-            className={`flex items-center w-full px-4 py-3 rounded-lg transition-colors duration-200 ${
+            className={`flex items-center w-full px-4 py-3 rounded-lg transition-colors duration-200 text-left ${
               currentView === item.id
                 ? 'bg-orange-100 text-orange-600 font-semibold'
                 : 'text-amber-700 hover:bg-orange-50 hover:text-orange-500'
             }`}
           >
             {item.icon}
-            <span className="ml-4">{item.label}</span>
+            <span className="ml-4 text-sm">{item.label}</span>
           </button>
         ))}
       </nav>
@@ -52,10 +53,10 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setCurrentView, onLogout
             onLogout();
             setIsOpen(false);
           }}
-          className="flex items-center w-full px-4 py-3 rounded-lg transition-colors duration-200 text-amber-700 hover:bg-orange-50 hover:text-orange-500"
+          className="flex items-center w-full px-4 py-3 rounded-lg transition-colors duration-200 text-amber-700 hover:bg-orange-50 hover:text-orange-500 text-left"
         >
           <ArrowRightOnRectangleIcon className="h-6 w-6" />
-          <span className="ml-4">Sair</span>
+          <span className="ml-4 text-sm">Sair</span>
         </button>
       </div>
       <div className="p-4 border-t border-orange-100 text-center text-xs text-amber-500">

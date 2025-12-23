@@ -17,6 +17,7 @@ const CompanyModal = ({ onSave, onClose }: { onSave: (company: Omit<Company, 'id
     phone: '',
     logoUrl: `https://picsum.photos/seed/${Date.now()}/200`,
     doorSale: false,
+    orderScheduling: true, // Padrão ativado para novas empresas
   });
   const [isLoadingCep, setIsLoadingCep] = useState(false);
 
@@ -80,16 +81,29 @@ const CompanyModal = ({ onSave, onClose }: { onSave: (company: Omit<Company, 'id
                     placeholder={isLoadingCep ? "Aguarde..." : "Preenchido automaticamente pelo CEP"}
                 />
             </div>
-            <div className="md:col-span-2 flex items-center gap-2">
-                <input 
-                    type="checkbox" 
-                    id="doorSale" 
-                    name="doorSale" 
-                    checked={formData.doorSale} 
-                    onChange={handleChange}
-                    className="h-5 w-5 rounded border-orange-300 text-orange-600 focus:ring-orange-500 cursor-pointer"
-                />
-                <label htmlFor="doorSale" className="text-sm font-medium text-amber-700 cursor-pointer">Venda na porta</label>
+            <div className="md:col-span-2 flex items-center gap-6">
+                <div className="flex items-center gap-2">
+                    <input 
+                        type="checkbox" 
+                        id="doorSale" 
+                        name="doorSale" 
+                        checked={formData.doorSale} 
+                        onChange={handleChange}
+                        className="h-5 w-5 rounded border-orange-300 text-orange-600 focus:ring-orange-500 cursor-pointer"
+                    />
+                    <label htmlFor="doorSale" className="text-sm font-medium text-amber-700 cursor-pointer">Venda na porta</label>
+                </div>
+                <div className="flex items-center gap-2">
+                    <input 
+                        type="checkbox" 
+                        id="orderScheduling" 
+                        name="orderScheduling" 
+                        checked={formData.orderScheduling} 
+                        onChange={handleChange}
+                        className="h-5 w-5 rounded border-orange-300 text-orange-600 focus:ring-orange-500 cursor-pointer"
+                    />
+                    <label htmlFor="orderScheduling" className="text-sm font-medium text-amber-700 cursor-pointer">Agendamento de pedidos</label>
+                </div>
             </div>
           </div>
 
@@ -138,12 +152,18 @@ const CompanyManagement: React.FC<CompanyManagementProps> = ({ companies, onAdd,
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
                         <h3 className="font-bold text-base text-amber-800 truncate">{company.name}</h3>
-                        {company.doorSale && (
-                            <span className="flex items-center gap-1 text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full font-bold uppercase">
-                                <CheckCircleIcon className="h-3 w-3" />
-                                Porta
-                            </span>
-                        )}
+                        <div className="flex gap-1">
+                          {company.doorSale && (
+                              <span className="flex items-center gap-1 text-[9px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full font-bold uppercase">
+                                  Porta
+                              </span>
+                          )}
+                          {company.orderScheduling && (
+                              <span className="flex items-center gap-1 text-[9px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full font-bold uppercase">
+                                  Agenda
+                              </span>
+                          )}
+                        </div>
                     </div>
                     <div className="flex items-center gap-2">
                         <p className="text-xs text-amber-600">{company.cnpj}</p>

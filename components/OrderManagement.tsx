@@ -1,123 +1,88 @@
 
-import React, { useState, useRef, useEffect } from 'react';
-import { Company, Order, OrderItem, Product, RecurringOrderConfig } from '../types';
+import React, { useState } from 'react';
+import { Company, Order, OrderItem, Product } from '../types';
 import Card from './common/Card';
-import Input from './common/Input';
 import Button from './common/Button';
-import { TrashIcon, PlusIcon, BuildingStorefrontIcon, XMarkIcon, ClipboardDocumentListIcon, CalendarDaysIcon, PencilSquareIcon, CheckCircleIcon, EyeIcon } from './Icons';
-import RecurringOrderModal from './RecurringOrderModal';
+import { TrashIcon, XMarkIcon, PlusIcon, CheckCircleIcon, EyeIcon, ShoppingBagIcon } from './Icons';
 
-// Modal for viewing an existing signature
-const ViewSignatureModal = ({ signature, onClose }: { signature: string, onClose: () => void }) => {
-  return (
-    <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4" onClick={onClose}>
-      <Card className="w-full max-w-lg bg-white p-6 relative" onClick={(e) => e.stopPropagation()}>
-        <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600" aria-label="Fechar">
-          <XMarkIcon className="h-6 w-6" />
-        </button>
-        <h3 className="text-lg font-bold text-amber-800 mb-4">Assinatura Coletada</h3>
-        <div className="bg-gray-50 border border-orange-100 rounded-lg p-4 flex items-center justify-center min-h-[200px]">
-          <img src={signature} alt="Assinatura" className="max-h-48" />
-        </div>
-        <div className="mt-6">
-          <Button onClick={onClose} className="w-full">Fechar</Button>
-        </div>
-      </Card>
-    </div>
-  );
-};
+// Modal para Visualizar Assinatura
+const ViewSignatureModal = ({ signature, onClose }: { signature: string, onClose: () => void }) => (
+  <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4 backdrop-blur-sm" onClick={onClose}>
+    <Card className="w-full max-w-lg bg-white p-6 relative" onClick={(e) => e.stopPropagation()}>
+      <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600">
+        <XMarkIcon className="h-6 w-6" />
+      </button>
+      <h3 className="text-sm font-black text-amber-900 mb-4 uppercase tracking-tight">Assinatura Coletada</h3>
+      <div className="bg-gray-50 border border-orange-100 rounded-xl p-4 flex items-center justify-center min-h-[200px]">
+        <img src={signature} alt="Assinatura" className="max-h-48" />
+      </div>
+      <Button onClick={onClose} className="w-full mt-6">Fechar</Button>
+    </Card>
+  </div>
+);
 
-// Signature Canvas Component for collecting new signature
+// Modal de Coleta de Assinatura
 const SignatureModal = ({ onSave, onClose }: { onSave: (signature: string) => void, onClose: () => void }) => {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const canvasRef = React.useRef<HTMLCanvasElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
 
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-    ctx.strokeStyle = '#000';
-    ctx.lineWidth = 2;
-    ctx.lineCap = 'round';
-  }, []);
-
-  const getPos = (e: React.MouseEvent | React.TouchEvent | MouseEvent | TouchEvent) => {
+  const getPos = (e: React.MouseEvent | React.TouchEvent) => {
     const canvas = canvasRef.current;
     if (!canvas) return { x: 0, y: 0 };
     const rect = canvas.getBoundingClientRect();
-    if ('touches' in e) {
-      return {
-        x: e.touches[0].clientX - rect.left,
-        y: e.touches[0].clientY - rect.top
-      };
-    }
-    return {
-      x: (e as MouseEvent).clientX - rect.left,
-      y: (e as MouseEvent).clientY - rect.top
-    };
+    const clientX = 'touches' in e ? e.touches[0].clientX : (e as React.MouseEvent).clientX;
+    const clientY = 'touches' in e ? e.touches[0].clientY : (e as React.MouseEvent).clientY;
+    return { x: clientX - rect.left, y: clientY - rect.top };
   };
 
   const startDrawing = (e: React.MouseEvent | React.TouchEvent) => {
     setIsDrawing(true);
     const pos = getPos(e);
     const ctx = canvasRef.current?.getContext('2d');
-    ctx?.beginPath();
-    ctx?.moveTo(pos.x, pos.y);
+    if (ctx) { 
+      ctx.strokeStyle = '#000'; 
+      ctx.lineWidth = 3; 
+      ctx.lineCap = 'round'; 
+      ctx.beginPath(); 
+      ctx.moveTo(pos.x, pos.y); 
+    }
   };
 
   const draw = (e: React.MouseEvent | React.TouchEvent) => {
     if (!isDrawing) return;
     const pos = getPos(e);
-    const ctx = canvasRef.current?.getContext('2d');
-    ctx?.lineTo(pos.x, pos.y);
-    ctx?.stroke();
-  };
-
-  const stopDrawing = () => {
-    setIsDrawing(false);
-  };
-
-  const clear = () => {
-    const canvas = canvasRef.current;
-    const ctx = canvas?.getContext('2d');
-    if (canvas && ctx) {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-    }
+    canvasRef.current?.getContext('2d')?.lineTo(pos.x, pos.y);
+    canvasRef.current?.getContext('2d')?.stroke();
   };
 
   const save = () => {
     const canvas = canvasRef.current;
-    if (canvas) {
-      const dataUrl = canvas.toDataURL('image/png');
-      onSave(dataUrl);
-    }
+    if (canvas) onSave(canvas.toDataURL('image/png'));
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-      <Card className="w-full max-w-lg bg-white p-6">
+    <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+      <Card className="w-full max-w-lg bg-white p-6 shadow-2xl">
         <div className="flex justify-between items-center mb-4">
-          <h3 className="text-lg font-bold text-amber-800">Assinatura do Funcionário</h3>
-          <button onClick={onClose} aria-label="Fechar"><XMarkIcon className="h-6 w-6 text-gray-400" /></button>
+          <h3 className="text-lg font-black text-amber-900 uppercase">Coletar Assinatura Digital</h3>
+          <button onClick={onClose}><XMarkIcon className="h-6 w-6 text-gray-400" /></button>
         </div>
-        <div className="border-2 border-dashed border-orange-200 rounded-lg bg-gray-50 mb-6">
-          <canvas
-            ref={canvasRef}
-            width={500}
-            height={200}
-            className="w-full h-48 cursor-crosshair touch-none"
-            onMouseDown={startDrawing}
-            onMouseMove={draw}
-            onMouseUp={stopDrawing}
-            onMouseLeave={stopDrawing}
-            onTouchStart={startDrawing}
-            onTouchMove={draw}
-            onTouchEnd={stopDrawing}
+        <div className="border border-gray-200 rounded-xl bg-gray-50 mb-6 overflow-hidden">
+          <canvas 
+            ref={canvasRef} 
+            width={500} 
+            height={250} 
+            className="w-full h-56 cursor-crosshair touch-none bg-white" 
+            onMouseDown={startDrawing} 
+            onMouseMove={draw} 
+            onMouseUp={() => setIsDrawing(false)} 
+            onTouchStart={startDrawing} 
+            onTouchMove={draw} 
+            onTouchEnd={() => setIsDrawing(false)} 
           />
         </div>
-        <div className="flex justify-between gap-4">
-          <Button variant="secondary" onClick={clear} className="flex-1">Limpar</Button>
+        <div className="flex gap-3">
+          <Button onClick={() => { const c = canvasRef.current; c?.getContext('2d')?.clearRect(0,0,c.width,c.height); }} variant="secondary" className="flex-1">Limpar</Button>
           <Button onClick={save} className="flex-1">Confirmar Assinatura</Button>
         </div>
       </Card>
@@ -125,93 +90,66 @@ const SignatureModal = ({ onSave, onClose }: { onSave: (signature: string) => vo
   );
 };
 
-// Modal for adding a new order
-const OrderModal = ({ availableProducts, onSave, onClose }: { availableProducts: Product[], onSave: (order: Omit<Order, 'id'>) => void, onClose: () => void }) => {
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+// Modal para Novo Pedido
+const AddOrderModal = ({ products, onSave, onClose }: { products: Product[], onSave: (items: Omit<OrderItem, 'id'>[]) => void, onClose: () => void }) => {
   const [items, setItems] = useState<Omit<OrderItem, 'id'>[]>([{ productName: '', quantity: 1 }]);
 
-  const handleItemChange = (index: number, field: 'productName' | 'quantity', value: string | number) => {
-    const newItems = [...items];
-    if (field === 'quantity') {
-      newItems[index][field] = Number(value) < 1 ? 1 : Number(value);
-    } else {
-      newItems[index][field] = value as string;
-    }
-    setItems(newItems);
-  };
-
-  const addItem = () => {
-    setItems([...items, { productName: '', quantity: 1 }]);
-  };
-
-  const removeItem = (index: number) => {
-    setItems(items.filter((_, i) => i !== index));
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const validItems = items.filter(item => item.productName.trim() !== '' && item.quantity > 0).map(item => ({...item, id: `item-${Date.now()}-${Math.random()}`}));
-    if (validItems.length === 0) {
-      return;
-    }
-    onSave({ date, items: validItems });
+  const handleAddItem = () => setItems([...items, { productName: '', quantity: 1 }]);
+  const handleRemoveItem = (idx: number) => setItems(items.filter((_, i) => i !== idx));
+  const handleItemChange = (idx: number, field: string, value: any) => {
+    const updated = [...items];
+    (updated[idx] as any)[field] = field === 'quantity' ? Math.max(1, Number(value)) : value;
+    setItems(updated);
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-40 flex items-center justify-center p-4 animate-fade-in" role="dialog" aria-modal="true">
-      <Card className="w-full max-w-2xl relative max-h-[90vh] flex flex-col">
-        <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600" aria-label="Fechar">
-          <XMarkIcon className="h-6 w-6" />
-        </button>
-        <form onSubmit={handleSubmit} className="p-8 flex flex-col flex-grow">
-          <h3 className="text-xl font-semibold text-amber-800 mb-6">Adicionar Novo Pedido</h3>
-          <div className="flex-grow overflow-y-auto pr-2">
-            <Input label="Data do Pedido" name="date" type="date" value={date} onChange={(e) => setDate(e.target.value)} required />
-            <h4 className="text-lg font-medium text-amber-700 mt-6 mb-2">Itens do Pedido</h4>
-            <div className="space-y-4">
-              {items.map((item, index) => (
-                <div key={index} className="flex items-end gap-2 p-3 bg-orange-50/50 rounded-md border border-orange-100">
-                  <div className="flex-grow">
-                     <label htmlFor={`product-select-${index}`} className="block text-sm font-medium text-amber-700 mb-1">
-                        Produto {index + 1}
-                    </label>
-                    <select
-                        id={`product-select-${index}`}
-                        value={item.productName}
-                        onChange={(e) => handleItemChange(index, 'productName', e.target.value)}
-                        required
-                        className="w-full px-4 py-2 bg-white border border-orange-200 rounded-md shadow-sm focus:ring-orange-500 focus:border-orange-500 transition-colors"
-                    >
-                        <option value="" disabled>Selecione um produto</option>
-                        {availableProducts.map(p => (
-                            <option key={p.id} value={p.name}>{p.name}</option>
-                        ))}
-                    </select>
-                  </div>
-                  <div className="w-24">
-                    <Input label="Qtd." name="quantity" type="number" min="1" value={item.quantity} onChange={(e) => handleItemChange(index, 'quantity', e.target.value)} required />
-                  </div>
-                  <button type="button" onClick={() => removeItem(index)} className="text-red-500 hover:text-red-700 p-2 rounded-full hover:bg-red-100 transition-colors" aria-label="Remover Item">
-                    <TrashIcon className="h-5 w-5" />
-                  </button>
-                </div>
-              ))}
+    <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+      <Card className="w-full max-w-md bg-white p-6 shadow-2xl">
+        <div className="flex justify-between items-center mb-6">
+          <h3 className="text-lg font-black text-amber-900 uppercase">Novo Lançamento na Porta</h3>
+          <button onClick={onClose}><XMarkIcon className="h-6 w-6 text-gray-400" /></button>
+        </div>
+        <div className="space-y-3 max-h-[300px] overflow-y-auto pr-1 mb-4">
+          {items.map((item, idx) => (
+            <div key={idx} className="flex gap-2 items-end bg-gray-50 p-3 rounded-xl border border-gray-100">
+              <div className="flex-1">
+                <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">Produto</label>
+                <select 
+                  value={item.productName} 
+                  onChange={e => handleItemChange(idx, 'productName', e.target.value)}
+                  className="w-full bg-white border border-gray-200 rounded-lg p-2 text-sm font-bold text-amber-900"
+                >
+                  <option value="">Selecione...</option>
+                  {products.map(p => <option key={p.id} value={p.name}>{p.name}</option>)}
+                </select>
+              </div>
+              <div className="w-20">
+                <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">Qtd</label>
+                <input 
+                  type="number" 
+                  value={item.quantity} 
+                  onChange={e => handleItemChange(idx, 'quantity', e.target.value)}
+                  className="w-full bg-white border border-gray-200 rounded-lg p-2 text-sm font-black text-center"
+                />
+              </div>
+              <button type="button" onClick={() => handleRemoveItem(idx)} className="p-2 text-red-300 hover:text-red-500">
+                <TrashIcon className="h-5 w-5" />
+              </button>
             </div>
-            <Button type="button" variant="secondary" onClick={addItem} className="mt-4">
-              <PlusIcon className="h-4 w-4 mr-2" /> Adicionar Item
-            </Button>
-          </div>
-          <div className="mt-8 flex justify-end gap-4 pt-4 border-t border-orange-100">
-            <Button type="button" variant="secondary" onClick={onClose}>Cancelar</Button>
-            <Button type="submit">Salvar Pedido</Button>
-          </div>
-        </form>
+          ))}
+        </div>
+        <button onClick={handleAddItem} className="w-full py-2 border-2 border-dashed border-orange-200 rounded-xl text-[10px] font-black text-orange-500 uppercase hover:bg-orange-50 transition-all mb-6">
+          + Adicionar Item
+        </button>
+        <div className="flex gap-3">
+          <Button variant="secondary" onClick={onClose} className="flex-1">Cancelar</Button>
+          <Button onClick={() => onSave(items.filter(it => it.productName !== ''))} className="flex-1">Lançar Pedido</Button>
+        </div>
       </Card>
     </div>
   );
 };
 
-// Main Component
 interface OrderManagementProps {
   companies: Company[];
   selectedCompany: Company | null;
@@ -220,194 +158,164 @@ interface OrderManagementProps {
   onAddOrder: (order: Omit<Order, 'id'>) => void;
   onDeleteOrder: (orderId: string) => void;
   onUpdateOrderSignature?: (orderId: string, signature: string) => void;
-  onUpdateRecurringOrder?: (companyId: string, config: RecurringOrderConfig) => void;
   isDoorSaleMode?: boolean;
 }
 
-const OrderManagement: React.FC<OrderManagementProps> = ({ companies, selectedCompany, products, onSelectCompany, onAddOrder, onDeleteOrder, onUpdateOrderSignature, onUpdateRecurringOrder, isDoorSaleMode = false }) => {
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isRecurringModalOpen, setIsRecurringModalOpen] = useState(false);
-  const [signatureOrderId, setSignatureOrderId] = useState<string | null>(null);
-  const [viewSignatureUrl, setViewSignatureUrl] = useState<string | null>(null);
+const OrderManagement: React.FC<OrderManagementProps> = ({ 
+    companies, selectedCompany, products, onSelectCompany, onAddOrder, onDeleteOrder, onUpdateOrderSignature, isDoorSaleMode = false 
+}) => {
+  const [isAdding, setIsAdding] = useState(false);
+  const [sigOrderId, setSigOrderId] = useState<string | null>(null);
+  const [viewSigUrl, setViewSigUrl] = useState<string | null>(null);
 
-  const handleSaveOrder = (order: Omit<Order, 'id'>) => {
-    onAddOrder(order);
-    setIsModalOpen(false);
+  const handleSaveOrder = (items: Omit<OrderItem, 'id'>[]) => {
+    if (items.length === 0) return;
+    onAddOrder({ 
+      date: new Date().toISOString().split('T')[0], 
+      items: items.map(it => ({ ...it, id: Math.random().toString() })), 
+      status: 'confirmed',
+      isDoorSale: isDoorSaleMode // Identifica se é venda na porta
+    });
+    setIsAdding(false);
   };
 
-  const handleSaveRecurringOrder = (data: { items: Omit<OrderItem, 'id'>[], recurrence: any }) => {
-    if (selectedCompany && onUpdateRecurringOrder) {
-      onUpdateRecurringOrder(selectedCompany.id, data);
-      alert(`Agendamento ${data.recurrence.type} configurado para ${selectedCompany.name}`);
-    }
-    setIsRecurringModalOpen(false);
-  };
-
-  const handleSaveSignature = (signature: string) => {
-    if (signatureOrderId && onUpdateOrderSignature) {
-      onUpdateOrderSignature(signatureOrderId, signature);
-    }
-    setSignatureOrderId(null);
-  };
-  
-  const availableProductsForCompany = selectedCompany
-    ? products.filter(p => 
-        selectedCompany.productSettings?.some(s => s.productId === p.id && s.buys)
-      )
-    : [];
+  // Filtra apenas empresas que têm doorSale marcado se estiver no modo porta
+  const filteredCompanies = isDoorSaleMode ? companies.filter(c => c.doorSale) : companies;
+  const sortedOrders = selectedCompany?.orders.filter(o => o.status === 'confirmed').sort((a,b) => b.date.localeCompare(a.date)) || [];
 
   return (
-    <div className="space-y-6">
-      {isModalOpen && <OrderModal availableProducts={availableProductsForCompany} onSave={handleSaveOrder} onClose={() => setIsModalOpen(false)} />}
-      {isRecurringModalOpen && <RecurringOrderModal availableProducts={availableProductsForCompany} onSave={handleSaveRecurringOrder} onClose={() => setIsRecurringModalOpen(false)} />}
-      {signatureOrderId && <SignatureModal onSave={handleSaveSignature} onClose={() => setSignatureOrderId(null)} />}
-      {viewSignatureUrl && <ViewSignatureModal signature={viewSignatureUrl} onClose={() => setViewSignatureUrl(null)} />}
-      
-      <Card>
-        <div className="p-6 flex flex-col sm:flex-row justify-between sm:items-end gap-4">
-          <div className="flex-1">
-            <label htmlFor="company-select" className="block text-sm font-medium text-amber-700 mb-1">
-                Selecione uma empresa para gerenciar
+    <div className="space-y-8 animate-fade-in max-w-5xl mx-auto pb-12">
+      {isAdding && <AddOrderModal products={products} onSave={handleSaveOrder} onClose={() => setIsAdding(false)} />}
+      {sigOrderId && <SignatureModal onSave={(sig) => { onUpdateOrderSignature?.(sigOrderId, sig); setSigOrderId(null); }} onClose={() => setSigOrderId(null)} />}
+      {viewSigUrl && <ViewSignatureModal signature={viewSigUrl} onClose={() => setViewSigUrl(null)} />}
+
+      {/* Cabeçalho Página Venda na Porta */}
+      {isDoorSaleMode && (
+        <div className="flex items-center gap-4 mb-2">
+           <ShoppingBagIcon className="h-10 w-10 text-amber-800" />
+           <div>
+              <h1 className="text-4xl font-black text-amber-900 leading-none">Venda na Porta</h1>
+              <p className="text-sm font-bold text-amber-600 mt-1">Gerencie pedidos específicos de venda na porta.</p>
+           </div>
+        </div>
+      )}
+
+      {/* Card de Seleção: Igual ao print */}
+      <Card className="p-8 bg-[#e3ded8] border-none shadow-none rounded-[2rem]">
+        <div className="flex flex-col sm:flex-row items-end sm:items-center justify-between gap-6">
+          <div className="flex-1 w-full">
+            <label className="block text-xs font-bold text-amber-800 mb-3 ml-1">
+              Selecione uma empresa para gerenciar
             </label>
-            <select
-                id="company-select"
+            <div className="relative">
+              <select
                 value={selectedCompany?.id || ''}
                 onChange={(e) => onSelectCompany(e.target.value)}
-                className="w-full max-sm:max-w-full max-w-sm px-4 py-2 bg-white border border-orange-200 rounded-md shadow-sm focus:ring-orange-500 focus:border-orange-500 transition-colors"
-            >
-                <option value="" disabled>-- Escolha uma empresa --</option>
-                {companies.map(c => (
-                    <option key={c.id} value={c.id}>{c.name}</option>
-                ))}
-            </select>
-          </div>
-          {selectedCompany && (
-            <div className="flex flex-col sm:flex-row gap-2">
-                {!isDoorSaleMode && (
-                  <Button variant="secondary" onClick={() => setIsRecurringModalOpen(true)} className={selectedCompany.recurringOrder ? 'border-orange-500 bg-orange-50' : ''}>
-                      <CalendarDaysIcon className={`h-5 w-5 mr-2 ${selectedCompany.recurringOrder ? 'text-orange-600' : ''}`} />
-                      {selectedCompany.recurringOrder ? 'Editar Agendamento' : 'Definir Pedido Recorrente'}
-                  </Button>
-                )}
-                <Button onClick={() => setIsModalOpen(true)}>
-                    <PlusIcon className="h-5 w-5 mr-2" />
-                    Adicionar Pedido
-                </Button>
+                className="w-full max-w-lg px-5 py-3.5 bg-white/60 border border-gray-300 rounded-2xl font-bold text-amber-900 outline-none focus:ring-2 focus:ring-orange-500 transition-all appearance-none cursor-pointer"
+              >
+                <option value="" disabled>-- Selecionar Empresa --</option>
+                {filteredCompanies.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+              <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none">
+                <svg className="w-5 h-5 text-amber-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                </svg>
+              </div>
             </div>
+          </div>
+          
+          {selectedCompany && isDoorSaleMode && (
+            <button 
+              onClick={() => setIsAdding(true)}
+              className="flex items-center gap-2 bg-[#b84d16] text-white px-8 py-4 rounded-2xl font-black text-sm uppercase tracking-wide hover:bg-orange-800 transition-all shadow-xl shadow-orange-900/10"
+            >
+              <PlusIcon className="h-5 w-5" /> Adicionar Pedido
+            </button>
           )}
         </div>
       </Card>
-    
-      {selectedCompany ? (
-        <div className="space-y-4">
-          {selectedCompany.recurringOrder && !isDoorSaleMode && (
-             <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 flex items-center justify-between shadow-sm animate-fade-in">
-                <div className="flex items-center gap-3">
-                    <div className="p-2 bg-amber-100 rounded-full text-amber-700">
-                        <CalendarDaysIcon className="h-5 w-5" />
-                    </div>
-                    <div>
-                        <p className="text-sm font-bold text-amber-900">Agendamento Ativo</p>
-                        <p className="text-xs text-amber-700">Pedidos são gerados automaticamente: <strong>{selectedCompany.recurringOrder.recurrence.type === 'daily' ? 'Diariamente' : selectedCompany.recurringOrder.recurrence.type === 'weekdays' ? 'Segunda a Sexta' : 'Semanalmente'}</strong></p>
-                    </div>
-                </div>
+
+      {/* Histórico de Pedidos Confirmados */}
+      {selectedCompany && (
+        <div className="space-y-8 mt-10">
+          {sortedOrders.length > 0 ? (
+            sortedOrders.map(order => (
+              <Card key={order.id} className="p-8 bg-[#e3ded8] border-none shadow-none rounded-[2.5rem] relative group animate-fade-in-up">
+                {/* Botão Deletar Topo Direito */}
                 <button 
-                  onClick={() => setIsRecurringModalOpen(true)}
-                  className="text-xs font-bold text-amber-800 underline hover:text-amber-600"
+                  onClick={() => onDeleteOrder(order.id)} 
+                  className="absolute top-6 right-8 text-red-300 hover:text-red-500 transition-colors"
                 >
-                  Alterar itens ou frequência
+                  <TrashIcon className="h-6 w-6" />
                 </button>
-             </div>
-          )}
 
-          {selectedCompany.orders.length > 0 ? (
-            <Card className="p-0">
-              <ul className="divide-y divide-orange-100">
-                {selectedCompany.orders.map(order => (
-                  <li key={order.id} className="p-6 hover:bg-orange-50/30 transition-colors">
-                    <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4 mb-6">
-                      <div className="space-y-1">
-                        <h3 className="font-bold text-lg text-amber-800">
-                          Pedido de {new Date(order.date).toLocaleDateString('pt-BR', { timeZone: 'UTC', day: '2-digit', month: 'long', year: 'numeric' })}
-                        </h3>
-                        {order.id.startsWith('auto') && (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-orange-100 text-orange-800">
-                            Gerado Automaticamente
+                <h3 className="text-xl font-black text-amber-900 mb-8">
+                  Pedido de {new Date(order.date + 'T12:00:00Z').toLocaleDateString('pt-BR', { day: 'numeric', month: 'long', year: 'numeric' })}
+                </h3>
+
+                <div className="flex flex-col md:flex-row gap-10 items-start">
+                  {/* Lado Esquerdo: Lista de Produtos (Box Cinza Claro) */}
+                  <div className="flex-1 w-full bg-[#d6cfc7]/60 rounded-3xl p-6 border border-white/20">
+                    <div className="space-y-4">
+                      {order.items.map((it, idx) => (
+                        <div key={idx} className="flex justify-between items-center group/item">
+                          <span className="font-bold text-amber-900 text-base">{it.productName}</span>
+                          <span className="bg-[#e3ded8] text-amber-900 px-4 py-1.5 rounded-xl text-sm font-black border border-[#c4bbb0]">
+                            {it.quantity} un.
                           </span>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <button 
-                          onClick={() => onDeleteOrder(order.id)} 
-                          className="text-red-400 hover:text-red-600 p-2 rounded-full hover:bg-red-50 transition-colors" 
-                          aria-label="Deletar Pedido"
-                        >
-                          <TrashIcon className="h-5 w-5" />
-                        </button>
-                      </div>
-                    </div>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                      <div className="md:col-span-2 bg-orange-50/50 rounded-lg p-4 border border-orange-100">
-                        <ul className="divide-y divide-orange-100/50">
-                          {order.items.map(item => (
-                            <li key={item.id} className="flex justify-between items-center py-2.5 first:pt-0 last:pb-0">
-                              <span className="text-gray-700 font-medium">{item.productName}</span>
-                              <span className="text-amber-800 font-bold bg-white px-2 py-1 rounded border border-orange-100 text-sm">
-                                {item.quantity} un.
-                              </span>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-
-                      {isDoorSaleMode && (
-                        <div className="flex flex-col justify-center gap-3">
-                          <p className="text-xs font-semibold text-amber-700 uppercase tracking-wider">Assinatura do Funcionário</p>
-                          {order.signature ? (
-                            <div className="bg-green-50 border border-green-200 rounded-lg p-3 flex items-center justify-between animate-fade-in shadow-sm">
-                              <div className="flex items-center gap-2 text-green-700 font-bold text-xs">
-                                <CheckCircleIcon className="h-5 w-5 flex-shrink-0" />
-                                <span>Assinatura coletada com sucesso</span>
-                              </div>
-                              <button 
-                                onClick={() => setViewSignatureUrl(order.signature!)}
-                                className="p-1.5 bg-white border border-green-200 rounded-md text-green-600 hover:bg-green-100 transition-all shadow-sm active:scale-90"
-                                title="Visualizar Assinatura"
-                              >
-                                <EyeIcon className="h-4 w-4" />
-                              </button>
-                            </div>
-                          ) : (
-                            <button 
-                              onClick={() => setSignatureOrderId(order.id)}
-                              className="flex flex-col items-center justify-center gap-2 border-2 border-dashed border-orange-200 rounded-lg p-6 text-amber-600 hover:bg-orange-50 hover:border-orange-400 transition-all group"
-                            >
-                              <PencilSquareIcon className="h-8 w-8 group-hover:scale-110 transition-transform" />
-                              <span className="text-xs font-bold">Obter Assinatura</span>
-                            </button>
-                          )}
                         </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Lado Direito: Seção de Assinatura - SOMENTE EM MODO VENDA NA PORTA */}
+                  {isDoorSaleMode && (
+                    <div className="w-full md:w-80">
+                      <p className="text-[11px] font-black text-amber-700/60 uppercase tracking-widest mb-4">
+                        ASSINATURA DO FUNCIONÁRIO
+                      </p>
+                      
+                      {order.signature ? (
+                        <div className="flex items-center gap-3 bg-[#cde4da] border border-[#a8cfbd] p-5 rounded-2xl shadow-sm">
+                          <div className="h-8 w-8 rounded-full bg-white flex items-center justify-center border border-[#a8cfbd]">
+                            <CheckCircleIcon className="h-5 w-5 text-green-700" />
+                          </div>
+                          <div className="flex-1">
+                            <p className="text-xs font-black text-green-800">Assinatura coletada com sucesso</p>
+                          </div>
+                          <button 
+                            onClick={() => setViewSigUrl(order.signature!)}
+                            className="p-2.5 bg-white/40 border border-green-200/50 rounded-xl text-green-700 hover:bg-white/80 transition-all"
+                          >
+                            <EyeIcon className="h-5 w-5" />
+                          </button>
+                        </div>
+                      ) : (
+                        <button 
+                          onClick={() => setSigOrderId(order.id)}
+                          className="w-full flex items-center justify-center gap-3 bg-white/40 border-2 border-dashed border-amber-300/40 p-6 rounded-2xl text-amber-800 font-black text-xs uppercase tracking-tighter hover:bg-white/60 transition-all group/sig"
+                        >
+                          <PlusIcon className="h-5 w-5 group-hover/sig:scale-125 transition-transform" /> Coletar Assinatura
+                        </button>
                       )}
                     </div>
-                  </li>
-                ))}
-              </ul>
-            </Card>
+                  )}
+                </div>
+              </Card>
+            ))
           ) : (
-             <Card className="text-center p-12">
-                <ClipboardDocumentListIcon className="mx-auto h-12 w-12 text-gray-400" />
-                <h3 className="mt-2 text-lg font-medium text-gray-900">Nenhum pedido encontrado</h3>
-                <p className="mt-1 text-sm text-gray-500">Comece adicionando o primeiro pedido para {selectedCompany.name}.</p>
-             </Card>
+            <div className="text-center p-24 bg-white/20 border-4 border-dashed border-[#e3ded8] rounded-[3rem]">
+              <h3 className="text-lg font-black text-amber-400 uppercase tracking-widest">Nenhum pedido lançado</h3>
+              <p className="text-sm text-amber-500 font-bold mt-2">Os pedidos confirmados aparecerão aqui.</p>
+            </div>
           )}
         </div>
-      ) : (
-         <Card className="text-center p-12">
-            <BuildingStorefrontIcon className="mx-auto h-12 w-12 text-gray-400" />
-            <h3 className="mt-2 text-lg font-medium text-gray-900">Nenhuma empresa selecionada</h3>
-            <p className="mt-1 text-sm text-gray-500">Por favor, selecione uma empresa acima para ver seus pedidos.</p>
-         </Card>
+      )}
+
+      {!selectedCompany && (
+        <div className="text-center p-24 bg-[#e3ded8]/40 border-2 border-dashed border-[#c4bbb0] rounded-[3rem]">
+          <h3 className="text-sm font-black text-amber-400 uppercase tracking-widest">Aguardando seleção de cliente</h3>
+        </div>
       )}
     </div>
   );

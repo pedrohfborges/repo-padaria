@@ -4,7 +4,7 @@ import { RecurringOrderConfig, Product, OrderItem, RecurrenceType } from '../typ
 import Card from './common/Card';
 import Input from './common/Input';
 import Button from './common/Button';
-import { TrashIcon, PlusIcon, CalendarDaysIcon, ArrowPathIcon, UsersIcon } from './Icons';
+import { TrashIcon, PlusIcon, CalendarDaysIcon, ArrowPathIcon, UsersIcon, Cog6ToothIcon, CheckCircleIcon } from './Icons';
 
 interface FinancialParametersProps {
   recurringConfig?: RecurringOrderConfig;
@@ -16,11 +16,13 @@ interface FinancialParametersProps {
 const FinancialParameters: React.FC<FinancialParametersProps> = ({ recurringConfig, companyName, availableProducts, onUpdate }) => {
   const [items, setItems] = useState<Omit<OrderItem, 'id'>[]>(recurringConfig?.items || []);
   const [recurrenceType, setRecurrenceType] = useState<RecurrenceType>(recurringConfig?.recurrence.type || 'daily');
+  const [selectedDays, setSelectedDays] = useState<number[]>(recurringConfig?.recurrence.daysOfWeek || [0, 1, 2, 3, 4, 5, 6]);
   const [hasChanges, setHasChanges] = useState(false);
 
   useEffect(() => {
     setItems(recurringConfig?.items || []);
     setRecurrenceType(recurringConfig?.recurrence.type || 'daily');
+    setSelectedDays(recurringConfig?.recurrence.daysOfWeek || [0, 1, 2, 3, 4, 5, 6]);
     setHasChanges(false);
   }, [recurringConfig]);
 
@@ -47,6 +49,17 @@ const FinancialParameters: React.FC<FinancialParametersProps> = ({ recurringConf
 
   const handleRecurrenceTypeChange = (type: RecurrenceType) => {
     setRecurrenceType(type);
+    if (type === 'daily') setSelectedDays([0, 1, 2, 3, 4, 5, 6]);
+    else if (type === 'weekdays') setSelectedDays([1, 2, 3, 4, 5]);
+    setHasChanges(true);
+  };
+
+  const toggleDay = (day: number) => {
+    if (recurrenceType !== 'custom') return;
+    const newDays = selectedDays.includes(day)
+      ? selectedDays.filter(d => d !== day)
+      : [...selectedDays, day].sort();
+    setSelectedDays(newDays);
     setHasChanges(true);
   };
 
@@ -61,12 +74,10 @@ const FinancialParameters: React.FC<FinancialParametersProps> = ({ recurringConf
         items: validItems,
         recurrence: {
           type: recurrenceType,
+          daysOfWeek: selectedDays,
           interval: 1
         }
       };
-    } else {
-      // If user cleared all items, we might want to disable recurrence
-      finalRecurring = undefined;
     }
 
     onUpdate(finalRecurring);
@@ -77,8 +88,12 @@ const FinancialParameters: React.FC<FinancialParametersProps> = ({ recurringConf
   const handleCancel = () => {
     setItems(recurringConfig?.items || []);
     setRecurrenceType(recurringConfig?.recurrence.type || 'daily');
+    setSelectedDays(recurringConfig?.recurrence.daysOfWeek || [0, 1, 2, 3, 4, 5, 6]);
     setHasChanges(false);
   }
+
+  const daysLabels = ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'];
+  const fullDaysLabels = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
 
   return (
     <div className="mt-6 space-y-6 animate-fade-in">
@@ -129,13 +144,6 @@ const FinancialParameters: React.FC<FinancialParametersProps> = ({ recurringConf
                                 </button>
                             </div>
                         ))}
-                        
-                        {items.length === 0 && (
-                            <div className="text-center py-6 text-amber-600 italic text-sm">
-                                Nenhum item configurado para este agendamento.
-                            </div>
-                        )}
-
                         <button
                             type="button"
                             onClick={handleAddItem}
@@ -158,17 +166,17 @@ const FinancialParameters: React.FC<FinancialParametersProps> = ({ recurringConf
                             type="button"
                             onClick={() => handleRecurrenceTypeChange('daily')}
                             className={`flex flex-col items-center justify-center gap-2 p-4 rounded-xl border-2 font-bold transition-all ${
-                                recurrenceType === 'daily' ? 'bg-orange-500 border-orange-600 text-white shadow-md scale-105' : 'bg-white border-orange-100 text-amber-700 hover:bg-orange-50 hover:border-orange-200'
+                                recurrenceType === 'daily' ? 'bg-orange-500 border-orange-600 text-white shadow-md' : 'bg-white border-orange-100 text-amber-700 hover:bg-orange-50'
                             }`}
                         >
                             <ArrowPathIcon className="h-6 w-6" />
-                            <span className="text-sm">Diário</span>
+                            <span className="text-sm">Diário (Todos os dias)</span>
                         </button>
                         <button
                             type="button"
                             onClick={() => handleRecurrenceTypeChange('weekdays')}
                             className={`flex flex-col items-center justify-center gap-2 p-4 rounded-xl border-2 font-bold transition-all ${
-                                recurrenceType === 'weekdays' ? 'bg-orange-500 border-orange-600 text-white shadow-md scale-105' : 'bg-white border-orange-100 text-amber-700 hover:bg-orange-50 hover:border-orange-200'
+                                recurrenceType === 'weekdays' ? 'bg-orange-500 border-orange-600 text-white shadow-md' : 'bg-white border-orange-100 text-amber-700 hover:bg-orange-50'
                             }`}
                         >
                             <UsersIcon className="h-6 w-6" />
@@ -176,15 +184,42 @@ const FinancialParameters: React.FC<FinancialParametersProps> = ({ recurringConf
                         </button>
                         <button
                             type="button"
-                            onClick={() => handleRecurrenceTypeChange('weekly')}
+                            onClick={() => handleRecurrenceTypeChange('custom')}
                             className={`flex flex-col items-center justify-center gap-2 p-4 rounded-xl border-2 font-bold transition-all ${
-                                recurrenceType === 'weekly' ? 'bg-orange-500 border-orange-600 text-white shadow-md scale-105' : 'bg-white border-orange-100 text-amber-700 hover:bg-orange-50 hover:border-orange-200'
+                                recurrenceType === 'custom' ? 'bg-orange-500 border-orange-600 text-white shadow-md' : 'bg-white border-orange-100 text-amber-700 hover:bg-orange-50'
                             }`}
                         >
-                            <CalendarDaysIcon className="h-6 w-6" />
-                            <span className="text-sm">Semanal</span>
+                            <Cog6ToothIcon className="h-6 w-6" />
+                            <span className="text-sm">Personalizado</span>
                         </button>
                     </div>
+
+                    {/* Days selector for custom */}
+                    {(recurrenceType === 'custom' || true) && (
+                        <div className={`mt-6 p-6 bg-white border border-orange-100 rounded-xl shadow-sm transition-all duration-300 ${recurrenceType === 'custom' ? 'opacity-100 scale-100' : 'opacity-50 pointer-events-none'}`}>
+                            <h4 className="text-sm font-bold text-amber-700 mb-4">Selecione os dias da semana:</h4>
+                            <div className="flex justify-between gap-2 max-w-md mx-auto">
+                                {daysLabels.map((label, index) => (
+                                    <button
+                                        key={index}
+                                        type="button"
+                                        onClick={() => toggleDay(index)}
+                                        title={fullDaysLabels[index]}
+                                        className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm transition-all border-2 ${
+                                            selectedDays.includes(index)
+                                                ? 'bg-orange-500 border-orange-600 text-white shadow-sm'
+                                                : 'bg-white border-orange-200 text-amber-400 hover:border-orange-400'
+                                        }`}
+                                    >
+                                        {label}
+                                    </button>
+                                ))}
+                            </div>
+                            {recurrenceType === 'custom' && selectedDays.length === 0 && (
+                                <p className="text-center text-red-500 text-xs mt-3 font-medium">Selecione pelo menos um dia.</p>
+                            )}
+                        </div>
+                    )}
                 </div>
             </div>
 
@@ -192,7 +227,7 @@ const FinancialParameters: React.FC<FinancialParametersProps> = ({ recurringConf
                 <Button type="button" variant="secondary" onClick={handleCancel} disabled={!hasChanges}>
                     Descartar Alterações
                 </Button>
-                <Button type="submit" disabled={!hasChanges}>
+                <Button type="submit" disabled={!hasChanges || selectedDays.length === 0}>
                     Salvar Configuração de Recorrência
                 </Button>
             </div>
