@@ -1,10 +1,129 @@
-import React, { useState } from 'react';
+
+import React, { useState, useRef, useEffect } from 'react';
 import { Company, Order, OrderItem, Product } from '../types';
 import Card from './common/Card';
 import Input from './common/Input';
 import Button from './common/Button';
-import { TrashIcon, PlusIcon, BuildingStorefrontIcon, XMarkIcon, ClipboardDocumentListIcon, CalendarDaysIcon } from './Icons';
+import { TrashIcon, PlusIcon, BuildingStorefrontIcon, XMarkIcon, ClipboardDocumentListIcon, CalendarDaysIcon, PencilSquareIcon, CheckCircleIcon, EyeIcon } from './Icons';
 import RecurringOrderModal from './RecurringOrderModal';
+
+// Modal for viewing an existing signature
+const ViewSignatureModal = ({ signature, onClose }: { signature: string, onClose: () => void }) => {
+  return (
+    <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <Card className="w-full max-w-lg bg-white p-6 relative" onClick={(e) => e.stopPropagation()}>
+        <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600" aria-label="Fechar">
+          <XMarkIcon className="h-6 w-6" />
+        </button>
+        <h3 className="text-lg font-bold text-amber-800 mb-4">Assinatura Coletada</h3>
+        <div className="bg-gray-50 border border-orange-100 rounded-lg p-4 flex items-center justify-center min-h-[200px]">
+          <img src={signature} alt="Assinatura" className="max-h-48" />
+        </div>
+        <div className="mt-6">
+          <Button onClick={onClose} className="w-full">Fechar</Button>
+        </div>
+      </Card>
+    </div>
+  );
+};
+
+// Signature Canvas Component for collecting new signature
+const SignatureModal = ({ onSave, onClose }: { onSave: (signature: string) => void, onClose: () => void }) => {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [isDrawing, setIsDrawing] = useState(false);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.strokeStyle = '#000';
+    ctx.lineWidth = 2;
+    ctx.lineCap = 'round';
+  }, []);
+
+  const getPos = (e: React.MouseEvent | React.TouchEvent | MouseEvent | TouchEvent) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return { x: 0, y: 0 };
+    const rect = canvas.getBoundingClientRect();
+    if ('touches' in e) {
+      return {
+        x: e.touches[0].clientX - rect.left,
+        y: e.touches[0].clientY - rect.top
+      };
+    }
+    return {
+      x: (e as MouseEvent).clientX - rect.left,
+      y: (e as MouseEvent).clientY - rect.top
+    };
+  };
+
+  const startDrawing = (e: React.MouseEvent | React.TouchEvent) => {
+    setIsDrawing(true);
+    const pos = getPos(e);
+    const ctx = canvasRef.current?.getContext('2d');
+    ctx?.beginPath();
+    ctx?.moveTo(pos.x, pos.y);
+  };
+
+  const draw = (e: React.MouseEvent | React.TouchEvent) => {
+    if (!isDrawing) return;
+    const pos = getPos(e);
+    const ctx = canvasRef.current?.getContext('2d');
+    ctx?.lineTo(pos.x, pos.y);
+    ctx?.stroke();
+  };
+
+  const stopDrawing = () => {
+    setIsDrawing(false);
+  };
+
+  const clear = () => {
+    const canvas = canvasRef.current;
+    const ctx = canvas?.getContext('2d');
+    if (canvas && ctx) {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+    }
+  };
+
+  const save = () => {
+    const canvas = canvasRef.current;
+    if (canvas) {
+      const dataUrl = canvas.toDataURL('image/png');
+      onSave(dataUrl);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+      <Card className="w-full max-w-lg bg-white p-6">
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="text-lg font-bold text-amber-800">Assinatura do Funcionário</h3>
+          <button onClick={onClose} aria-label="Fechar"><XMarkIcon className="h-6 w-6 text-gray-400" /></button>
+        </div>
+        <div className="border-2 border-dashed border-orange-200 rounded-lg bg-gray-50 mb-6">
+          <canvas
+            ref={canvasRef}
+            width={500}
+            height={200}
+            className="w-full h-48 cursor-crosshair touch-none"
+            onMouseDown={startDrawing}
+            onMouseMove={draw}
+            onMouseUp={stopDrawing}
+            onMouseLeave={stopDrawing}
+            onTouchStart={startDrawing}
+            onTouchMove={draw}
+            onTouchEnd={stopDrawing}
+          />
+        </div>
+        <div className="flex justify-between gap-4">
+          <Button variant="secondary" onClick={clear} className="flex-1">Limpar</Button>
+          <Button onClick={save} className="flex-1">Confirmar Assinatura</Button>
+        </div>
+      </Card>
+    </div>
+  );
+};
 
 // Modal for adding a new order
 const OrderModal = ({ availableProducts, onSave, onClose }: { availableProducts: Product[], onSave: (order: Omit<Order, 'id'>) => void, onClose: () => void }) => {
@@ -33,10 +152,9 @@ const OrderModal = ({ availableProducts, onSave, onClose }: { availableProducts:
     e.preventDefault();
     const validItems = items.filter(item => item.productName.trim() !== '' && item.quantity > 0).map(item => ({...item, id: `item-${Date.now()}-${Math.random()}`}));
     if (validItems.length === 0) {
-      // Maybe show an error message
       return;
     }
-    onSave({ date, items: validItems, status: 'Pendente' });
+    onSave({ date, items: validItems });
   };
 
   return (
@@ -93,12 +211,6 @@ const OrderModal = ({ availableProducts, onSave, onClose }: { availableProducts:
   );
 };
 
-const statusColors: Record<Order['status'], string> = {
-    Pendente: 'bg-yellow-100 text-yellow-800',
-    Entregue: 'bg-green-100 text-green-800',
-    Cancelado: 'bg-red-100 text-red-800',
-};
-
 // Main Component
 interface OrderManagementProps {
   companies: Company[];
@@ -107,12 +219,15 @@ interface OrderManagementProps {
   onSelectCompany: (companyId: string) => void;
   onAddOrder: (order: Omit<Order, 'id'>) => void;
   onDeleteOrder: (orderId: string) => void;
-  onUpdateOrderStatus: (orderId: string, status: Order['status']) => void;
+  onUpdateOrderSignature?: (orderId: string, signature: string) => void;
+  isDoorSaleMode?: boolean;
 }
 
-const OrderManagement: React.FC<OrderManagementProps> = ({ companies, selectedCompany, products, onSelectCompany, onAddOrder, onDeleteOrder, onUpdateOrderStatus }) => {
+const OrderManagement: React.FC<OrderManagementProps> = ({ companies, selectedCompany, products, onSelectCompany, onAddOrder, onDeleteOrder, onUpdateOrderSignature, isDoorSaleMode = false }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isRecurringModalOpen, setIsRecurringModalOpen] = useState(false);
+  const [signatureOrderId, setSignatureOrderId] = useState<string | null>(null);
+  const [viewSignatureUrl, setViewSignatureUrl] = useState<string | null>(null);
 
   const handleSaveOrder = (order: Omit<Order, 'id'>) => {
     onAddOrder(order);
@@ -121,8 +236,14 @@ const OrderManagement: React.FC<OrderManagementProps> = ({ companies, selectedCo
 
   const handleSaveRecurringOrder = (data: { items: Omit<OrderItem, 'id'>[], recurrence: any }) => {
     console.log("Saving recurring order:", data);
-    // Here you would typically save the recurring order rule to your state or backend.
     setIsRecurringModalOpen(false);
+  };
+
+  const handleSaveSignature = (signature: string) => {
+    if (signatureOrderId && onUpdateOrderSignature) {
+      onUpdateOrderSignature(signatureOrderId, signature);
+    }
+    setSignatureOrderId(null);
   };
   
   const availableProductsForCompany = selectedCompany
@@ -132,12 +253,15 @@ const OrderManagement: React.FC<OrderManagementProps> = ({ companies, selectedCo
     : [];
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       {isModalOpen && <OrderModal availableProducts={availableProductsForCompany} onSave={handleSaveOrder} onClose={() => setIsModalOpen(false)} />}
       {isRecurringModalOpen && <RecurringOrderModal availableProducts={availableProductsForCompany} onSave={handleSaveRecurringOrder} onClose={() => setIsRecurringModalOpen(false)} />}
+      {signatureOrderId && <SignatureModal onSave={handleSaveSignature} onClose={() => setSignatureOrderId(null)} />}
+      {viewSignatureUrl && <ViewSignatureModal signature={viewSignatureUrl} onClose={() => setViewSignatureUrl(null)} />}
+      
       <Card>
         <div className="p-6 flex flex-col sm:flex-row justify-between sm:items-end gap-4">
-          <div>
+          <div className="flex-1">
             <label htmlFor="company-select" className="block text-sm font-medium text-amber-700 mb-1">
                 Selecione uma empresa para gerenciar
             </label>
@@ -155,10 +279,12 @@ const OrderManagement: React.FC<OrderManagementProps> = ({ companies, selectedCo
           </div>
           {selectedCompany && (
             <div className="flex flex-col sm:flex-row gap-2">
-                <Button variant="secondary" onClick={() => setIsRecurringModalOpen(true)}>
-                    <CalendarDaysIcon className="h-5 w-5 mr-2" />
-                    Definir Pedido Recorrente
-                </Button>
+                {!isDoorSaleMode && (
+                  <Button variant="secondary" onClick={() => setIsRecurringModalOpen(true)}>
+                      <CalendarDaysIcon className="h-5 w-5 mr-2" />
+                      Definir Pedido Recorrente
+                  </Button>
+                )}
                 <Button onClick={() => setIsModalOpen(true)}>
                     <PlusIcon className="h-5 w-5 mr-2" />
                     Adicionar Pedido
@@ -169,42 +295,76 @@ const OrderManagement: React.FC<OrderManagementProps> = ({ companies, selectedCo
       </Card>
     
       {selectedCompany ? (
-        <div className="space-y-6">
+        <div className="space-y-4">
           {selectedCompany.orders.length > 0 ? (
-            selectedCompany.orders.map(order => (
-              <Card key={order.id}>
-                <div className="p-6">
-                  <div className="flex flex-col sm:flex-row justify-between sm:items-start gap-4 mb-4">
-                    <div>
-                      <h3 className="font-bold text-lg text-amber-800">Pedido de {new Date(order.date).toLocaleDateString('pt-BR', { timeZone: 'UTC', day: '2-digit', month: 'long', year: 'numeric' })}</h3>
-                      <span className={`text-xs font-semibold px-2 py-1 rounded-full ${statusColors[order.status]}`}>{order.status}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <select
-                            value={order.status}
-                            onChange={(e) => onUpdateOrderStatus(order.id, e.target.value as Order['status'])}
-                            className="bg-white border border-orange-200 rounded-md text-sm p-1.5 focus:ring-orange-500 focus:border-orange-500"
+            <Card className="p-0">
+              <ul className="divide-y divide-orange-100">
+                {selectedCompany.orders.map(order => (
+                  <li key={order.id} className="p-6 hover:bg-orange-50/30 transition-colors">
+                    <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4 mb-6">
+                      <div className="space-y-1">
+                        <h3 className="font-bold text-lg text-amber-800">
+                          Pedido de {new Date(order.date).toLocaleDateString('pt-BR', { timeZone: 'UTC', day: '2-digit', month: 'long', year: 'numeric' })}
+                        </h3>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <button 
+                          onClick={() => onDeleteOrder(order.id)} 
+                          className="text-red-400 hover:text-red-600 p-2 rounded-full hover:bg-red-50 transition-colors" 
+                          aria-label="Deletar Pedido"
                         >
-                            <option>Pendente</option>
-                            <option>Entregue</option>
-                            <option>Cancelado</option>
-                        </select>
-                       <button onClick={() => onDeleteOrder(order.id)} className="text-red-500 hover:text-red-700 p-2 rounded-full hover:bg-red-100 transition-colors" aria-label="Deletar Pedido">
-                         <TrashIcon className="h-5 w-5" />
-                       </button>
+                          <TrashIcon className="h-5 w-5" />
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                  <ul className="divide-y divide-orange-100 border-t border-orange-100 pt-4">
-                    {order.items.map(item => (
-                      <li key={item.id} className="flex justify-between items-center py-2">
-                        <span className="text-gray-700">{item.productName}</span>
-                        <span className="font-medium text-gray-800">{item.quantity} un.</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              </Card>
-            ))
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                      <div className="md:col-span-2 bg-orange-50/50 rounded-lg p-4 border border-orange-100">
+                        <ul className="divide-y divide-orange-100/50">
+                          {order.items.map(item => (
+                            <li key={item.id} className="flex justify-between items-center py-2.5 first:pt-0 last:pb-0">
+                              <span className="text-gray-700 font-medium">{item.productName}</span>
+                              <span className="text-amber-800 font-bold bg-white px-2 py-1 rounded border border-orange-100 text-sm">
+                                {item.quantity} un.
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+
+                      {isDoorSaleMode && (
+                        <div className="flex flex-col justify-center gap-3">
+                          <p className="text-xs font-semibold text-amber-700 uppercase tracking-wider">Assinatura do Funcionário</p>
+                          {order.signature ? (
+                            <div className="bg-green-50 border border-green-200 rounded-lg p-3 flex items-center justify-between animate-fade-in shadow-sm">
+                              <div className="flex items-center gap-2 text-green-700 font-bold text-xs">
+                                <CheckCircleIcon className="h-5 w-5 flex-shrink-0" />
+                                <span>Assinatura coletada com sucesso</span>
+                              </div>
+                              <button 
+                                onClick={() => setViewSignatureUrl(order.signature!)}
+                                className="p-1.5 bg-white border border-green-200 rounded-md text-green-600 hover:bg-green-100 transition-all shadow-sm active:scale-90"
+                                title="Visualizar Assinatura"
+                              >
+                                <EyeIcon className="h-4 w-4" />
+                              </button>
+                            </div>
+                          ) : (
+                            <button 
+                              onClick={() => setSignatureOrderId(order.id)}
+                              className="flex flex-col items-center justify-center gap-2 border-2 border-dashed border-orange-200 rounded-lg p-6 text-amber-600 hover:bg-orange-50 hover:border-orange-400 transition-all group"
+                            >
+                              <PencilSquareIcon className="h-8 w-8 group-hover:scale-110 transition-transform" />
+                              <span className="text-xs font-bold">Obter Assinatura</span>
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </Card>
           ) : (
              <Card className="text-center p-12">
                 <ClipboardDocumentListIcon className="mx-auto h-12 w-12 text-gray-400" />

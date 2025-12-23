@@ -1,20 +1,40 @@
-import React, { useState } from 'react';
+
+import React, { useState, useEffect } from 'react';
 import { Company, Employee, Order, Product, CompanyProductSetting } from './types';
 import Sidebar from './components/Sidebar';
 import CompanyManagement from './components/CompanyProfile';
 import EmployeeManagement from './components/EmployeeManagement';
-import { BuildingStorefrontIcon, UsersIcon, ClipboardDocumentListIcon, TagIcon } from './components/Icons';
+import { BuildingStorefrontIcon, UsersIcon, ClipboardDocumentListIcon, TagIcon, ShoppingBagIcon } from './components/Icons';
 import LoginPage from './components/LoginPage';
 import OrderManagement from './components/OrderManagement';
 import ProductManagement from './components/ProductManagement';
 import CompanyDetailView from './components/CompanyDetailView';
 
-type View = 'companies' | 'employees' | 'orders' | 'products';
+type View = 'companies' | 'employees' | 'orders' | 'door-sales' | 'products';
 
-const App: React.FC = () => {
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
-  const [currentView, setCurrentView] = useState<View>('companies');
-  const [companies, setCompanies] = useState<Company[]>([
+// Helper functions for localStorage
+const loadFromLocalStorage = <T,>(key: string, defaultValue: T): T => {
+    try {
+        const storedValue = localStorage.getItem(key);
+        if (storedValue) {
+            return JSON.parse(storedValue);
+        }
+    } catch (error) {
+        console.error(`Error loading ${key} from localStorage`, error);
+    }
+    return defaultValue;
+};
+
+const saveToLocalStorage = <T,>(key: string, value: T) => {
+    try {
+        localStorage.setItem(key, JSON.stringify(value));
+    } catch (error) {
+        console.error(`Error saving ${key} to localStorage`, error);
+    }
+};
+
+
+const initialCompanies: Company[] = [
     {
       id: '1',
       name: 'Padaria Doce Pão',
@@ -23,12 +43,13 @@ const App: React.FC = () => {
       cep: '01234-567',
       phone: '(11) 98765-4321',
       logoUrl: 'https://picsum.photos/seed/bakerylogo/200',
+      doorSale: true,
       orders: [
-        { id: 'order-1', date: '2024-07-28', status: 'Entregue', items: [
+        { id: 'order-1', date: '2024-07-28', items: [
             { id: 'item-1-1', productName: 'Pão Francês', quantity: 50 },
             { id: 'item-1-2', productName: 'Croissant de Chocolate', quantity: 20 },
         ]},
-        { id: 'order-2', date: '2024-07-29', status: 'Pendente', items: [
+        { id: 'order-2', date: '2024-07-29', items: [
             { id: 'item-2-1', productName: 'Pão de Queijo', quantity: 100 },
             { id: 'item-2-2', productName: 'Bolo de Fubá', quantity: 5 },
         ]},
@@ -46,24 +67,48 @@ const App: React.FC = () => {
       cep: '23456-789',
       phone: '(21) 12345-6789',
       logoUrl: 'https://picsum.photos/seed/cafelogo/200',
+      doorSale: false,
       orders: [],
       productSettings: [
          { productId: 'prod-3', buys: true, price: 15.00 }
       ]
     }
-  ]);
-  const [employees, setEmployees] = useState<Employee[]>([
+];
+
+const initialEmployees: Employee[] = [
       { id: 'emp-1', name: 'Roberto Carlos', role: 'Padeiro Mestre', admissionDate: '2021-03-20', salary: 3800, status: 'Ativo' },
       { id: 'emp-2', name: 'Ana Maria Braga', role: 'Gerente', admissionDate: '2020-11-01', salary: 5200, status: 'Ativo' },
       { id: 'emp-3', name: 'José das Couves', role: 'Entregador', admissionDate: '2023-08-15', salary: 2500, status: 'Inativo' },
-  ]);
-  const [products, setProducts] = useState<Product[]>([
+];
+
+const initialProducts: Product[] = [
       { id: 'prod-1', name: 'Pão Francês', category: 'Pães' },
       { id: 'prod-2', name: 'Croissant de Chocolate', category: 'Viennoiserie' },
       { id: 'prod-3', name: 'Bolo de Fubá', category: 'Bolos' },
-  ]);
+];
+
+const App: React.FC = () => {
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
+  const [currentView, setCurrentView] = useState<View>('companies');
+  
+  const [companies, setCompanies] = useState<Company[]>(() => loadFromLocalStorage('companies', initialCompanies));
+  const [employees, setEmployees] = useState<Employee[]>(() => loadFromLocalStorage('employees', initialEmployees));
+  const [products, setProducts] = useState<Product[]>(() => loadFromLocalStorage('products', initialProducts));
+
   const [selectedCompanyId, setSelectedCompanyId] = useState<string | null>(companies[0]?.id || null);
   const [viewingCompanyId, setViewingCompanyId] = useState<string | null>(null);
+
+  useEffect(() => {
+    saveToLocalStorage('companies', companies);
+  }, [companies]);
+
+  useEffect(() => {
+    saveToLocalStorage('employees', employees);
+  }, [employees]);
+
+  useEffect(() => {
+    saveToLocalStorage('products', products);
+  }, [products]);
 
   const handleLogin = (user: string, pass: string): boolean => {
     if (user === 'admin' && pass === 'admin') {
@@ -81,6 +126,19 @@ const App: React.FC = () => {
   const handleSetCurrentView = (view: View) => {
     setCurrentView(view);
     setViewingCompanyId(null); // Reset detail view when changing main view
+    
+    // Reset selected company when switching between orders and door-sales to avoid showing wrong list
+    const filtered = view === 'orders' 
+        ? companies.filter(c => !c.doorSale) 
+        : view === 'door-sales' 
+            ? companies.filter(c => c.doorSale) 
+            : companies;
+    
+    if (filtered.length > 0) {
+        setSelectedCompanyId(filtered[0].id);
+    } else {
+        setSelectedCompanyId(null);
+    }
   }
 
   const handleAddCompany = (newCompanyData: Omit<Company, 'id' | 'orders'>) => {
@@ -98,14 +156,19 @@ const App: React.FC = () => {
   };
   
   const handleUpdateCompanyProductSettings = (companyId: string, newSettings: CompanyProductSetting[]) => {
-    setCompanies(prev => prev.map(c => c.id === companyId ? { ...c, productSettings: newSettings } : c));
+    setCompanies(prev => prev.map(c => {
+      if (c.id === companyId) {
+        return { ...c, productSettings: newSettings };
+      }
+      return c;
+    }));
   };
 
   const handleDeleteCompany = (companyId: string) => {
-    setCompanies(prev => prev.filter(c => c.id !== companyId));
+    const remainingCompanies = companies.filter(c => c.id !== companyId);
+    setCompanies(remainingCompanies);
     if (selectedCompanyId === companyId) {
-      const remainingCompany = companies.find(c => c.id !== companyId);
-      setSelectedCompanyId(remainingCompany ? remainingCompany.id : null);
+      setSelectedCompanyId(remainingCompanies.length > 0 ? remainingCompanies[0].id : null);
     }
      if (viewingCompanyId === companyId) {
       setViewingCompanyId(null);
@@ -151,13 +214,13 @@ const App: React.FC = () => {
     }));
   };
 
-  const handleUpdateOrderStatus = (orderId: string, status: Order['status']) => {
+  const handleUpdateOrderSignature = (orderId: string, signature: string) => {
     if (!selectedCompanyId) return;
     setCompanies(prev => prev.map(c => {
       if (c.id === selectedCompanyId) {
         return {
           ...c,
-          orders: c.orders.map(o => o.id === orderId ? { ...o, status } : o)
+          orders: c.orders.map(o => o.id === orderId ? { ...o, signature } : o)
         };
       }
       return c;
@@ -212,13 +275,25 @@ const App: React.FC = () => {
                 />;
       case 'orders':
         return <OrderManagement 
-                  companies={companies}
+                  companies={companies.filter(c => !c.doorSale)}
                   selectedCompany={selectedCompany}
                   products={products}
                   onSelectCompany={setSelectedCompanyId}
                   onAddOrder={handleAddOrder}
                   onDeleteOrder={handleDeleteOrder}
-                  onUpdateOrderStatus={handleUpdateOrderStatus}
+                  onUpdateOrderSignature={handleUpdateOrderSignature}
+                  isDoorSaleMode={false}
+               />;
+      case 'door-sales':
+        return <OrderManagement 
+                  companies={companies.filter(c => c.doorSale)}
+                  selectedCompany={selectedCompany}
+                  products={products}
+                  onSelectCompany={setSelectedCompanyId}
+                  onAddOrder={handleAddOrder}
+                  onDeleteOrder={handleDeleteOrder}
+                  onUpdateOrderSignature={handleUpdateOrderSignature}
+                  isDoorSaleMode={true}
                />;
       case 'products':
         return <ProductManagement 
@@ -239,7 +314,8 @@ const App: React.FC = () => {
   const headerInfo = {
     companies: { icon: <BuildingStorefrontIcon className="h-8 w-8 text-orange-500" />, title: 'Gerenciamento de Empresas', subtitle: 'Adicione, visualize e edite as informações das suas empresas clientes.' },
     employees: { icon: <UsersIcon className="h-8 w-8 text-orange-500" />, title: 'Gerenciamento de Funcionários', subtitle: 'Gerencie a equipe da Engenho do Pão.' },
-    orders: { icon: <ClipboardDocumentListIcon className="h-8 w-8 text-orange-500" />, title: 'Gerenciamento de Pedidos', subtitle: 'Registre e acompanhe os pedidos diários de cada cliente.' },
+    orders: { icon: <ClipboardDocumentListIcon className="h-8 w-8 text-orange-500" />, title: 'Gerenciamento de Pedidos', subtitle: 'Registre e acompanhe os pedidos diários de clientes regulares.' },
+    'door-sales': { icon: <ShoppingBagIcon className="h-8 w-8 text-orange-500" />, title: 'Venda na Porta', subtitle: 'Gerencie pedidos específicos de venda na porta.' },
     products: { icon: <TagIcon className="h-8 w-8 text-orange-500" />, title: 'Gerenciamento de Produtos', subtitle: 'Cadastre e organize os produtos oferecidos pela padaria.' },
   };
   

@@ -1,0 +1,21 @@
+{
+  "short_name": "Gestão Fácil",
+  "name": "Sistema de Padaria Gestão Fácil",
+  "description": "Um sistema para a 'Engenho do Pão' gerenciar suas empresas clientes, funcionários e pedidos diários.",
+  "icons": [
+    {
+      "src": "https://picsum.photos/seed/pwa-icon-192/192",
+      "type": "image/png",
+      "sizes": "192x192"
+    },
+    {
+      "src": "https://picsum.photos/seed/pwa-icon-512/512",
+      "type": "image/png",
+      "sizes": "512x512"
+    }
+  ],
+  "start_url": ".",
+  "display": "standalone",
+  "theme_color": "#f97316",
+  "background_color": "#fff7ed"
+}

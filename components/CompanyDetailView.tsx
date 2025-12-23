@@ -1,6 +1,7 @@
+
 import React, { useState, useEffect } from 'react';
 import { Company, Product, CompanyProductSetting } from '../types';
-import { PencilIcon, ChevronLeftIcon } from './Icons';
+import { PencilIcon, ChevronLeftIcon, CheckCircleIcon } from './Icons';
 import Card from './common/Card';
 import Input from './common/Input';
 import Button from './common/Button';
@@ -186,8 +187,11 @@ const GeneralDataTab = ({ company, onUpdate }: { company: Company, onUpdate: (c:
   }, [company, isEditing]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    const { name, value, type, checked } = e.target;
+    setFormData(prev => ({ 
+      ...prev, 
+      [name]: type === 'checkbox' ? checked : value 
+    }));
   };
 
    const handleCepBlur = async (e: React.FocusEvent<HTMLInputElement>) => {
@@ -248,6 +252,35 @@ const GeneralDataTab = ({ company, onUpdate }: { company: Company, onUpdate: (c:
                   disabled={isLoadingCep}
                   placeholder={isLoadingCep ? "Aguarde..." : "Preenchido automaticamente pelo CEP"}
                />
+            </div>
+            <div className="md:col-span-2 mt-2">
+                {isEditing ? (
+                    <div className="flex items-center gap-2">
+                        <input 
+                            type="checkbox" 
+                            id="doorSale" 
+                            name="doorSale" 
+                            checked={formData.doorSale} 
+                            onChange={handleChange}
+                            className="h-5 w-5 rounded border-orange-300 text-orange-600 focus:ring-orange-500 cursor-pointer"
+                        />
+                        <label htmlFor="doorSale" className="text-sm font-medium text-amber-700 cursor-pointer">Venda na porta</label>
+                    </div>
+                ) : (
+                    <div>
+                        <p className="block text-sm font-medium text-amber-700 mb-1">Venda na porta</p>
+                        <div className="flex items-center gap-2 text-gray-800 bg-gray-100/50 px-4 py-2 rounded-md min-h-[42px]">
+                            {formData.doorSale ? (
+                                <span className="flex items-center gap-1 text-green-700 font-bold text-sm">
+                                    <CheckCircleIcon className="h-5 w-5" />
+                                    Sim
+                                </span>
+                            ) : (
+                                <span className="text-gray-500 text-sm italic">Não</span>
+                            )}
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
 

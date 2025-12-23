@@ -1,3 +1,4 @@
+
 export interface OrderItem {
   id: string;
   productName: string;
@@ -8,7 +9,7 @@ export interface Order {
   id: string;
   date: string; // YYYY-MM-DD
   items: OrderItem[];
-  status: 'Pendente' | 'Entregue' | 'Cancelado';
+  signature?: string; // Base64 encoded image string
 }
 
 export interface CompanyProductSetting {
@@ -36,6 +37,7 @@ export interface Company {
   productSettings?: CompanyProductSetting[];
   // FIX: Added optional financials property to Company type.
   financials?: FinancialParams;
+  doorSale?: boolean;
 }
 
 

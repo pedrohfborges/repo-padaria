@@ -1,12 +1,12 @@
+
 import React, { useState } from 'react';
 import { Company } from '../types';
 import Card from './common/Card';
 import Input from './common/Input';
 import Button from './common/Button';
-import { TrashIcon, BuildingStorefrontIcon, PencilIcon, PlusIcon, XMarkIcon } from './Icons';
+import { TrashIcon, BuildingStorefrontIcon, PencilIcon, PlusIcon, XMarkIcon, CheckCircleIcon } from './Icons';
 
 // Modal Component for Adding a new Company
-// FIX: Removed 'financials' from Omit type to match the expected type in App.tsx.
 const CompanyModal = ({ onSave, onClose }: { onSave: (company: Omit<Company, 'id' | 'orders'>) => void, onClose: () => void }) => {
   
   const [formData, setFormData] = useState({
@@ -16,12 +16,16 @@ const CompanyModal = ({ onSave, onClose }: { onSave: (company: Omit<Company, 'id
     cep: '',
     phone: '',
     logoUrl: `https://picsum.photos/seed/${Date.now()}/200`,
+    doorSale: false,
   });
   const [isLoadingCep, setIsLoadingCep] = useState(false);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    const { name, value, type, checked } = e.target;
+    setFormData(prev => ({ 
+      ...prev, 
+      [name]: type === 'checkbox' ? checked : value 
+    }));
   };
 
   const handleCepBlur = async (e: React.FocusEvent<HTMLInputElement>) => {
@@ -76,6 +80,17 @@ const CompanyModal = ({ onSave, onClose }: { onSave: (company: Omit<Company, 'id
                     placeholder={isLoadingCep ? "Aguarde..." : "Preenchido automaticamente pelo CEP"}
                 />
             </div>
+            <div className="md:col-span-2 flex items-center gap-2">
+                <input 
+                    type="checkbox" 
+                    id="doorSale" 
+                    name="doorSale" 
+                    checked={formData.doorSale} 
+                    onChange={handleChange}
+                    className="h-5 w-5 rounded border-orange-300 text-orange-600 focus:ring-orange-500 cursor-pointer"
+                />
+                <label htmlFor="doorSale" className="text-sm font-medium text-amber-700 cursor-pointer">Venda na porta</label>
+            </div>
           </div>
 
           <div className="mt-8 flex justify-end gap-4">
@@ -90,7 +105,6 @@ const CompanyModal = ({ onSave, onClose }: { onSave: (company: Omit<Company, 'id
 
 interface CompanyManagementProps {
   companies: Company[];
-  // FIX: Removed 'financials' from Omit type to match handleAddCompany in App.tsx.
   onAdd: (company: Omit<Company, 'id' | 'orders'>) => void;
   onUpdate: (company: Company) => void;
   onDelete: (companyId: string) => void;
@@ -100,7 +114,6 @@ interface CompanyManagementProps {
 const CompanyManagement: React.FC<CompanyManagementProps> = ({ companies, onAdd, onUpdate, onDelete, onViewCompany }) => {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
 
-  // FIX: Removed 'financials' from Omit type to align with the prop type change.
   const handleSave = (companyData: Omit<Company, 'id' | 'orders'>) => {
     onAdd(companyData);
     setIsAddModalOpen(false);
@@ -119,21 +132,30 @@ const CompanyManagement: React.FC<CompanyManagementProps> = ({ companies, onAdd,
         <Card className="p-0">
           <ul className="divide-y divide-orange-100">
             {companies.map(company => (
-              <li key={company.id} className="p-4 flex items-start sm:items-center justify-between hover:bg-orange-50/50 transition-colors flex-col sm:flex-row gap-4 cursor-pointer" onClick={() => onViewCompany(company.id)}>
+              <li key={company.id} className="px-4 py-3 flex items-start sm:items-center justify-between hover:bg-orange-50/50 transition-colors flex-col sm:flex-row gap-3 cursor-pointer" onClick={() => onViewCompany(company.id)}>
                 <div className="flex items-center gap-4 flex-1 min-w-0">
-                  <img src={company.logoUrl} alt={`Logo de ${company.name}`} className="h-16 w-16 rounded-full object-cover flex-shrink-0" />
+                  <img src={company.logoUrl} alt={`Logo de ${company.name}`} className="h-12 w-12 rounded-full object-cover flex-shrink-0" />
                   <div className="min-w-0">
-                    <h3 className="font-bold text-lg text-amber-800 truncate">{company.name}</h3>
-                    <p className="text-sm text-amber-600">{company.cnpj}</p>
-                    <div className="text-sm text-gray-600 space-y-1 mt-2">
-                        <p className="truncate">{company.address}</p>
-                        <p>{company.phone}</p>
+                    <div className="flex items-center gap-2">
+                        <h3 className="font-bold text-base text-amber-800 truncate">{company.name}</h3>
+                        {company.doorSale && (
+                            <span className="flex items-center gap-1 text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full font-bold uppercase">
+                                <CheckCircleIcon className="h-3 w-3" />
+                                Porta
+                            </span>
+                        )}
                     </div>
+                    <div className="flex items-center gap-2">
+                        <p className="text-xs text-amber-600">{company.cnpj}</p>
+                        <span className="text-gray-300">•</span>
+                        <p className="text-xs text-amber-600">{company.phone}</p>
+                    </div>
+                    <p className="text-xs text-gray-500 truncate mt-0.5">{company.address}</p>
                   </div>
                 </div>
                 <div className="flex gap-2 self-end sm:self-center">
-                  <button onClick={(e) => { e.stopPropagation(); onDelete(company.id); }} className="text-red-500 hover:text-red-700 p-2 rounded-full hover:bg-red-100 transition-colors" aria-label="Deletar Empresa">
-                      <TrashIcon className="h-5 w-5" />
+                  <button onClick={(e) => { e.stopPropagation(); onDelete(company.id); }} className="text-red-400 hover:text-red-600 p-1.5 rounded-full hover:bg-red-50 transition-colors" aria-label="Deletar Empresa">
+                      <TrashIcon className="h-4 w-4" />
                   </button>
                 </div>
               </li>
