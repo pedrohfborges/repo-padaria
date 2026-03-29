@@ -1,17 +1,35 @@
 
 import React, { useState, useEffect } from 'react';
-import { Company, Employee, Order, Product, CompanyProductSetting, RecurringOrderConfig } from './types';
+import { Company, Order, Product, CompanyProductSetting, RecurringOrderConfig } from './types';
 import Sidebar from './components/Sidebar';
 import CompanyManagement from './components/CompanyProfile';
-import EmployeeManagement from './components/EmployeeManagement';
-import { BuildingStorefrontIcon, UsersIcon, ClipboardDocumentListIcon, TagIcon, ShoppingBagIcon, CheckCircleIcon } from './components/Icons';
+import { BuildingStorefrontIcon, ClipboardDocumentListIcon, TagIcon, ShoppingBagIcon, CheckCircleIcon, PlusIcon } from './components/Icons';
 import LoginPage from './components/LoginPage';
 import OrderManagement from './components/OrderManagement';
 import ProductManagement from './components/ProductManagement';
 import CompanyDetailView from './components/CompanyDetailView';
 import ScheduledConfirmation from './components/ScheduledConfirmation';
+import { DocumentTextIcon, ChartBarIcon, ArchiveBoxIcon } from './components/Icons';
 
-type View = 'companies' | 'employees' | 'orders' | 'door-sales' | 'products' | 'scheduled-confirmation';
+type View = 'companies' | 'orders' | 'door-sales' | 'products' | 'scheduled-confirmation' | 'manual-order' | 'invoices' | 'reports' | 'inventory';
+
+/**
+ * ==============================================================================
+ * DOCUMENTAÇÃO DE NEGÓCIO - LÓGICA DE APLICAÇÃO
+ * ==============================================================================
+ * 
+ * 1. PERSISTÊNCIA:
+ *    - Atualmente utiliza localStorage para simular o banco de dados.
+ *    - Em produção, deve ser migrado para o backend (server.ts) com PostgreSQL.
+ * 
+ * 2. FLUXO DE PRODUÇÃO (handleConfirmAllQueue):
+ *    - Oficializa previsões (drafts) geradas por recorrência.
+ *    - Transforma pedidos 'pending' em 'confirmed'.
+ * 
+ * 3. VENDAS NA PORTA:
+ *    - Exige assinaturas digitais e timestamps para conformidade.
+ * ==============================================================================
+ */
 
 const loadFromLocalStorage = <T,>(key: string, defaultValue: T): T => {
     try {
@@ -29,10 +47,11 @@ const initialCompanies: Company[] = [
     {
       id: '1',
       name: 'Padaria Doce Pão',
+      type: 'PJ',
       cnpj: '12.345.678/0001-99',
       address: 'Rua das Flores, 123, São Paulo - SP',
       cep: '01234-567',
-      phone: '(11) 98765-4321',
+      phone: '(11)98765-4321',
       logoUrl: 'https://picsum.photos/seed/bakerylogo/200',
       doorSale: true,
       orders: [],
@@ -46,14 +65,18 @@ const initialCompanies: Company[] = [
 const App: React.FC = () => {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [currentView, setCurrentView] = useState<View>('companies');
-  const [companies, setCompanies] = useState<Company[]>(() => loadFromLocalStorage('companies', initialCompanies));
-  const [employees, setEmployees] = useState<Employee[]>(() => loadFromLocalStorage('employees', []));
-  const [products, setProducts] = useState<Product[]>(() => loadFromLocalStorage('products', []));
+  const [companies, setCompanies] = useState<Company[]>(() => {
+    const loaded = loadFromLocalStorage('companies', initialCompanies);
+    return [...loaded].sort((a, b) => a.name.localeCompare(b.name));
+  });
+  const [products, setProducts] = useState<Product[]>(() => {
+    const loaded = loadFromLocalStorage('products', []);
+    return [...loaded].sort((a, b) => a.name.localeCompare(b.name));
+  });
   const [selectedCompanyId, setSelectedCompanyId] = useState<string | null>(null);
   const [viewingCompanyId, setViewingCompanyId] = useState<string | null>(null);
 
   useEffect(() => { saveToLocalStorage('companies', companies); }, [companies]);
-  useEffect(() => { saveToLocalStorage('employees', employees); }, [employees]);
   useEffect(() => { saveToLocalStorage('products', products); }, [products]);
 
   // Função Unificada para Confirmar Toda a Fila
@@ -115,11 +138,11 @@ const App: React.FC = () => {
 
   const handleAddCompany = (newCompanyData: Omit<Company, 'id' | 'orders'>) => {
     const newCompany: Company = { ...newCompanyData, id: Date.now().toString(), orders: [], productSettings: [] };
-    setCompanies(prev => [...prev, newCompany]);
+    setCompanies(prev => [...prev, newCompany].sort((a, b) => a.name.localeCompare(b.name)));
   };
 
   const handleUpdateCompany = (updatedCompany: Company) => {
-    setCompanies(prev => prev.map(c => c.id === updatedCompany.id ? updatedCompany : c));
+    setCompanies(prev => prev.map(c => c.id === updatedCompany.id ? updatedCompany : c).sort((a, b) => a.name.localeCompare(b.name)));
   };
 
   const handleDeleteCompany = (companyId: string) => {
@@ -151,9 +174,22 @@ const App: React.FC = () => {
     setCompanies(prev => prev.map(c => c.id === targetId ? { ...c, orders: c.orders.filter(o => o.id !== orderId) } : c));
   };
 
-  const handleUpdateOrderSignature = (orderId: string, signature: string) => {
+  const handleUpdateOrderSignature = (orderId: string, signature: string, type: 'seller' | 'buyer') => {
     if (!selectedCompanyId) return;
-    setCompanies(prev => prev.map(c => c.id === selectedCompanyId ? { ...c, orders: c.orders.map(o => o.id === orderId ? { ...o, signature } : o) } : c));
+    const now = new Date().toISOString();
+    setCompanies(prev => prev.map(c => c.id === selectedCompanyId ? { 
+      ...c, 
+      orders: c.orders.map(o => {
+        if (o.id === orderId) {
+          if (type === 'seller') {
+            return { ...o, sellerSignature: signature, sellerSignatureTime: now };
+          } else {
+            return { ...o, buyerSignature: signature, buyerSignatureTime: now };
+          }
+        }
+        return o;
+      }) 
+    } : c));
   };
 
   const renderContent = () => {
@@ -166,11 +202,14 @@ const App: React.FC = () => {
 
     switch (currentView) {
       case 'companies': return <CompanyManagement companies={companies} onAdd={handleAddCompany} onUpdate={handleUpdateCompany} onDelete={handleDeleteCompany} onViewCompany={setViewingCompanyId} />;
-      case 'employees': return <EmployeeManagement employees={employees} onAddEmployee={(e) => setEmployees(prev => [...prev, { ...e, id: `emp-${Date.now()}`, status: 'Ativo' }])} onDeleteEmployee={(id) => setEmployees(prev => prev.filter(e => e.id !== id))} onUpdateEmployeeStatus={(id, s) => setEmployees(prev => prev.map(e => e.id === id ? { ...e, status: s } : e))} />;
       case 'scheduled-confirmation': return <ScheduledConfirmation companies={companies} products={products} onConfirmAllQueue={handleConfirmAllQueue} onDeleteOrder={handleDeleteOrder} onAddManualOrder={handleAddOrder} />;
-      case 'orders': return <OrderManagement companies={companies} selectedCompany={selectedCompany} products={products} onSelectCompany={setSelectedCompanyId} onAddOrder={handleAddOrder} onDeleteOrder={(id) => handleDeleteOrder(id)} onUpdateOrderSignature={handleUpdateOrderSignature} onUpdateRecurringOrder={handleUpdateRecurringOrder} isDoorSaleMode={false} />;
+      case 'manual-order': return <OrderManagement companies={companies} selectedCompany={selectedCompany} products={products} onSelectCompany={setSelectedCompanyId} onAddOrder={handleAddOrder} onDeleteOrder={(id) => handleDeleteOrder(id)} onUpdateOrderSignature={handleUpdateOrderSignature} isDoorSaleMode={false} isManualLaunchMode={true} />;
+      case 'orders': return <OrderManagement companies={companies} selectedCompany={selectedCompany} products={products} onSelectCompany={setSelectedCompanyId} onAddOrder={handleAddOrder} onDeleteOrder={(id) => handleDeleteOrder(id)} onUpdateOrderSignature={handleUpdateOrderSignature} isDoorSaleMode={false} />;
       case 'door-sales': return <OrderManagement companies={companies.filter(c => c.doorSale)} selectedCompany={selectedCompany} products={products} onSelectCompany={setSelectedCompanyId} onAddOrder={handleAddOrder} onDeleteOrder={(id) => handleDeleteOrder(id)} onUpdateOrderSignature={handleUpdateOrderSignature} isDoorSaleMode={true} />;
-      case 'products': return <ProductManagement products={products} onAdd={(p) => setProducts(prev => [...prev, { ...p, id: `prod-${Date.now()}` }])} onUpdate={(p) => setProducts(prev => prev.map(prod => prod.id === p.id ? p : prod))} onDelete={(id) => setProducts(prev => prev.filter(p => p.id !== id))} />;
+      case 'products': return <ProductManagement products={products} onAdd={(p) => setProducts(prev => [...prev, { ...p, id: `prod-${Date.now()}` }].sort((a, b) => a.name.localeCompare(b.name)))} onUpdate={(p) => setProducts(prev => prev.map(prod => prod.id === p.id ? p : prod).sort((a, b) => a.name.localeCompare(b.name)))} onDelete={(id) => setProducts(prev => prev.filter(p => p.id !== id))} />;
+      case 'invoices': return <div className="p-12 text-center text-amber-800 bg-white rounded-2xl shadow-sm border border-orange-100"><DocumentTextIcon className="h-10 w-10 mx-auto mb-3 text-orange-200" /><h2 className="text-sm font-black uppercase tracking-widest mb-1">Nota Fiscal</h2><p className="text-[10px] font-bold text-amber-500 uppercase tracking-tighter opacity-60">Módulo em desenvolvimento.</p></div>;
+      case 'reports': return <div className="p-12 text-center text-amber-800 bg-white rounded-2xl shadow-sm border border-orange-100"><ChartBarIcon className="h-10 w-10 mx-auto mb-3 text-orange-200" /><h2 className="text-sm font-black uppercase tracking-widest mb-1">Relatórios</h2><p className="text-[10px] font-bold text-amber-500 uppercase tracking-tighter opacity-60">Módulo em desenvolvimento.</p></div>;
+      case 'inventory': return <div className="p-12 text-center text-amber-800 bg-white rounded-2xl shadow-sm border border-orange-100"><ArchiveBoxIcon className="h-10 w-10 mx-auto mb-3 text-orange-200" /><h2 className="text-sm font-black uppercase tracking-widest mb-1">Estoque</h2><p className="text-[10px] font-bold text-amber-500 uppercase tracking-tighter opacity-60">Módulo em desenvolvimento.</p></div>;
       default: return null;
     }
   };
@@ -178,28 +217,37 @@ const App: React.FC = () => {
   if (!isAuthenticated) return <LoginPage onLogin={handleLogin} />;
   
   const headerInfo = {
-    companies: { icon: <BuildingStorefrontIcon className="h-8 w-8 text-orange-500" />, title: 'Gerenciamento de Empresas', subtitle: 'Adicione, visualize e edite as informações das suas empresas clientes.' },
-    employees: { icon: <UsersIcon className="h-8 w-8 text-orange-500" />, title: 'Gerenciamento de Funcionários', subtitle: 'Gerencie a equipe da Engenho do Pão.' },
-    'scheduled-confirmation': { icon: <CheckCircleIcon className="h-8 w-8 text-orange-500" />, title: 'Fila de Produção & Confirmação', subtitle: 'Gerencie todos os pedidos aguardando confirmação (agendados e manuais).' },
-    orders: { icon: <ClipboardDocumentListIcon className="h-8 w-8 text-orange-500" />, title: 'Histórico de pedidos', subtitle: 'Acompanhe o registro histórico de pedidos de todos os clientes.' },
-    'door-sales': { icon: <ShoppingBagIcon className="h-8 w-8 text-orange-500" />, title: 'Venda na Porta', subtitle: 'Gerencie pedidos específicos de venda na porta.' },
-    products: { icon: <TagIcon className="h-8 w-8 text-orange-500" />, title: 'Gerenciamento de Produtos', subtitle: 'Cadastre e organize os produtos oferecidos pela padaria.' },
+    companies: { icon: <BuildingStorefrontIcon className="h-5 w-5 text-orange-500" />, title: 'Cadastro de cliente', subtitle: 'Gestão de clientes e parceiros.' },
+    'scheduled-confirmation': { icon: <CheckCircleIcon className="h-5 w-5 text-orange-500" />, title: 'Produção', subtitle: 'Confirmar pedidos com Recorrência.' },
+    'manual-order': { icon: <PlusIcon className="h-5 w-5 text-orange-500" />, title: 'Pedido Manual', subtitle: 'Lançamento imediato de pedidos.' },
+    orders: { icon: <ClipboardDocumentListIcon className="h-5 w-5 text-orange-500" />, title: 'Histórico', subtitle: 'Registro de pedidos realizados.' },
+    'door-sales': { icon: <ShoppingBagIcon className="h-5 w-5 text-orange-500" />, title: 'Venda na Porta', subtitle: 'Pedidos específicos de balcão.' },
+    products: { icon: <TagIcon className="h-5 w-5 text-orange-500" />, title: 'Cadastro de Produtos', subtitle: 'Catálogo de itens oferecidos.' },
+    invoices: { icon: <DocumentTextIcon className="h-5 w-5 text-orange-500" />, title: 'Nota Fiscal', subtitle: 'Emissão e controle de NF.' },
+    reports: { icon: <ChartBarIcon className="h-5 w-5 text-orange-500" />, title: 'Relatórios', subtitle: 'Métricas e desempenho.' },
+    inventory: { icon: <ArchiveBoxIcon className="h-5 w-5 text-orange-500" />, title: 'Estoque', subtitle: 'Controle de insumos e itens.' },
   };
 
   return (
-    <div className="flex h-screen bg-orange-50 font-sans">
+    <div className="flex h-screen bg-orange-50/30 font-sans">
       <Sidebar currentView={currentView} setCurrentView={handleSetCurrentView} onLogout={handleLogout} />
-      <main className="flex-1 p-4 md:p-8 overflow-y-auto">
+      <main className="flex-1 p-4 md:p-6 overflow-y-auto">
         {!(currentView === 'companies' && viewingCompanyId) && (
-          <header className="mb-8">
-              <div className="flex items-center gap-4">
-                  {headerInfo[currentView].icon}
-                  <h1 className="text-3xl font-bold text-amber-800">{headerInfo[currentView].title}</h1>
+          <header className="mb-6 flex items-center justify-between border-b border-orange-100 pb-4">
+              <div className="flex items-center gap-3">
+                  <div className="bg-white p-2 rounded-lg shadow-sm border border-orange-50">
+                    {headerInfo[currentView].icon}
+                  </div>
+                  <div>
+                    <h1 className="text-sm font-black text-amber-900 uppercase tracking-widest">{headerInfo[currentView].title}</h1>
+                    <p className="text-[10px] font-bold text-amber-500 uppercase tracking-tighter opacity-60">{headerInfo[currentView].subtitle}</p>
+                  </div>
               </div>
-              <p className="text-amber-600 mt-1">{headerInfo[currentView].subtitle}</p>
           </header>
         )}
-        {renderContent()}
+        <div className="max-w-5xl mx-auto">
+          {renderContent()}
+        </div>
       </main>
     </div>
   );

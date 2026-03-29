@@ -4,7 +4,7 @@ import { Product } from '../types';
 import Card from './common/Card';
 import Input from './common/Input';
 import Button from './common/Button';
-import { TrashIcon, TagIcon, PencilIcon, PlusIcon, XMarkIcon } from './Icons';
+import { TrashIcon, TagIcon, PencilIcon, PlusIcon, XMarkIcon, MagnifyingGlassIcon } from './Icons';
 
 // Modal Component - Minimalist Version
 const ProductModal = ({ product, onSave, onClose }: { product: Partial<Product> | null, onSave: (product: Omit<Product, 'id'> | Product) => void, onClose: () => void }) => {
@@ -33,32 +33,26 @@ const ProductModal = ({ product, onSave, onClose }: { product: Partial<Product> 
   const isEditing = 'id' in product && product.id;
 
   return (
-    <div className="fixed inset-0 bg-amber-900/10 z-50 flex items-center justify-center p-4 backdrop-blur-[2px] animate-fade-in" role="dialog" aria-modal="true">
-      <div className="w-full max-w-md bg-white rounded-[2.5rem] shadow-2xl shadow-amber-900/5 relative overflow-hidden border border-white">
-        <button 
-          onClick={onClose} 
-          className="absolute top-6 right-6 text-amber-200 hover:text-amber-500 transition-colors p-1" 
-          aria-label="Fechar"
-        >
+    <div className="fixed inset-0 bg-black/20 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in" role="dialog" aria-modal="true">
+      <div className="w-full max-w-2xl bg-white rounded-3xl shadow-2xl relative overflow-hidden">
+        <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors p-1" aria-label="Fechar">
           <XMarkIcon className="h-5 w-5" />
         </button>
         
-        <form onSubmit={handleSubmit} className="p-10">
-          <header className="mb-8">
-            <h3 className="text-xl font-medium text-amber-900 tracking-tight">
-              {isEditing ? 'Editar Produto' : 'Novo Produto'}
+        <form onSubmit={handleSubmit} className="p-8 max-h-[90vh] overflow-y-auto">
+          <header className="mb-6">
+            <h3 className="text-xl font-bold text-amber-900">
+              {isEditing ? 'Editar Produto' : 'Cadastro'}
             </h3>
-            <div className="h-0.5 w-8 bg-orange-400 mt-2 rounded-full"></div>
           </header>
 
-          <div className="space-y-8">
+          <div className="space-y-4">
             <Input 
               label="Nome do Produto" 
               name="name" 
               value={formData.name} 
               onChange={handleChange} 
               required 
-              placeholder="Ex: Pão de Sal" 
             />
             <Input 
               label="Categoria" 
@@ -66,19 +60,12 @@ const ProductModal = ({ product, onSave, onClose }: { product: Partial<Product> 
               value={formData.category} 
               onChange={handleChange} 
               required 
-              placeholder="Ex: Padaria" 
             />
           </div>
 
-          <div className="mt-12 flex items-center gap-3">
-            <button 
-              type="button" 
-              onClick={onClose}
-              className="flex-1 px-6 py-3.5 text-sm font-semibold text-amber-700 hover:text-amber-900 transition-colors"
-            >
-              Cancelar
-            </button>
-            <Button type="submit" className="flex-1 shadow-lg shadow-orange-500/20 py-3.5 rounded-2xl">
+          <div className="mt-8 flex justify-end gap-3">
+            <Button type="button" variant="secondary" onClick={onClose}>Cancelar</Button>
+            <Button type="submit">
               {isEditing ? 'Salvar' : 'Cadastrar'}
             </Button>
           </div>
@@ -97,6 +84,8 @@ interface ProductManagementProps {
 
 const ProductManagement: React.FC<ProductManagementProps> = ({ products, onAdd, onUpdate, onDelete }) => {
   const [modalProduct, setModalProduct] = useState<Partial<Product> | null>(null);
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const handleSave = (productData: Omit<Product, 'id'> | Product) => {
     if ('id' in productData && productData.id) {
@@ -107,58 +96,99 @@ const ProductManagement: React.FC<ProductManagementProps> = ({ products, onAdd, 
     setModalProduct(null);
   };
 
+  const filteredProducts = products.filter(product => 
+    product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    product.category.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
   return (
-    <div className="space-y-8 animate-fade-in max-w-5xl mx-auto">
-       <div className="flex justify-between items-center px-2">
-        <h2 className="text-lg font-medium text-amber-900/60">Catálogo de Itens</h2>
-        <Button onClick={() => setModalProduct({})} className="rounded-2xl">
-          <PlusIcon className="h-5 w-5 mr-2" />
-          Adicionar Produto
-        </Button>
+    <div className="space-y-6 animate-fade-in max-w-4xl mx-auto">
+      <div className="flex justify-between items-center">
+        <h2 className="text-sm font-bold text-amber-900/40 uppercase tracking-widest">Catálogo de Itens</h2>
+        
+        <div className="flex items-center gap-2">
+          {isSearchOpen && (
+            <div className="relative animate-in slide-in-from-right-2 fade-in duration-200">
+              <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-amber-400" />
+              <input 
+                type="text"
+                placeholder="Pesquisar..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-8 pr-3 py-2.5 bg-white border border-orange-100 rounded-lg text-xs font-bold text-amber-900 outline-none focus:ring-1 focus:ring-orange-500 transition-all w-32 sm:w-64"
+                autoFocus
+              />
+              {searchQuery && (
+                <button 
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-amber-400 hover:text-amber-600"
+                >
+                  <XMarkIcon className="h-3 w-3" />
+                </button>
+              )}
+            </div>
+          )}
+          
+          <button 
+            onClick={() => setIsSearchOpen(!isSearchOpen)}
+            className={`p-2.5 rounded-lg border transition-all ${
+              isSearchOpen 
+                ? 'bg-amber-900 text-white border-amber-900 shadow-inner' 
+                : 'bg-white text-amber-900 border-orange-100 hover:bg-orange-50 shadow-sm'
+            }`}
+            title="Pesquisar"
+          >
+            <MagnifyingGlassIcon className="h-4 w-4" />
+          </button>
+          
+          <Button onClick={() => setModalProduct({})}>
+            <PlusIcon className="h-4 w-4 mr-2" />
+            Cadastro
+          </Button>
+        </div>
       </div>
 
-      <div className="bg-white rounded-[2rem] border border-orange-50/50 overflow-hidden shadow-sm">
       {products.length > 0 ? (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left">
-              <thead>
-                <tr className="border-b border-orange-50">
-                  <th className="p-6 text-[11px] font-bold text-amber-800/40 uppercase tracking-[0.2em]">Produto</th>
-                  <th className="p-6 text-[11px] font-bold text-amber-800/40 uppercase tracking-[0.2em]">Categoria</th>
-                  <th className="p-6 text-[11px] font-bold text-amber-800/40 uppercase tracking-[0.2em] text-right">Ações</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-orange-50/30">
-                {products.map(product => (
-                  <tr key={product.id} className="hover:bg-orange-50/20 transition-colors group">
-                    <td className="p-6 font-semibold text-amber-900">{product.name}</td>
-                    <td className="p-6">
-                      <span className="text-amber-700/60 text-sm bg-amber-50/50 px-3 py-1 rounded-full border border-amber-100/50">
-                        {product.category}
-                      </span>
-                    </td>
-                    <td className="p-6 text-right">
-                       <div className="flex gap-2 justify-end opacity-0 group-hover:opacity-100 transition-opacity">
-                          <button onClick={() => setModalProduct(product)} className="text-amber-400 hover:text-amber-600 p-2.5 rounded-xl hover:bg-white transition-all shadow-sm border border-transparent hover:border-orange-100" aria-label="Editar Produto">
-                              <PencilIcon className="h-4 w-4" />
-                          </button>
-                          <button onClick={() => onDelete(product.id)} className="text-red-200 hover:text-red-400 p-2.5 rounded-xl hover:bg-white transition-all shadow-sm border border-transparent hover:border-red-50" aria-label="Deletar Produto">
-                              <TrashIcon className="h-4 w-4" />
-                          </button>
-                        </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+        <div className="grid grid-cols-1 gap-3">
+          {filteredProducts.length > 0 ? (
+            filteredProducts.map(product => (
+              <div 
+                key={product.id} 
+                className="bg-white p-3 rounded-xl flex items-center justify-between hover:shadow-sm transition-all cursor-pointer group border border-orange-50/50"
+                onClick={() => setModalProduct(product)}
+              >
+                <div className="flex items-center gap-3 flex-1 min-w-0">
+                  <div className="h-10 w-10 rounded-lg bg-orange-50 flex items-center justify-center flex-shrink-0 border border-orange-100">
+                    <TagIcon className="h-5 w-5 text-orange-400" />
+                  </div>
+                  <div className="min-w-0">
+                    <h3 className="font-bold text-amber-900 text-sm truncate">{product.name}</h3>
+                    <p className="text-[9px] text-gray-400 font-medium uppercase tracking-tighter">{product.category}</p>
+                  </div>
+                </div>
+                <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <button 
+                    onClick={(e) => { e.stopPropagation(); onDelete(product.id); }} 
+                    className="text-gray-300 hover:text-red-500 p-1.5 rounded-lg hover:bg-red-50 transition-all"
+                    title="Excluir Produto"
+                  >
+                    <TrashIcon className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+            ))
+          ) : (
+            <div className="text-center py-12 bg-white rounded-3xl border border-dashed border-orange-100">
+              <p className="text-xs font-bold text-amber-900/40 uppercase tracking-widest">Nenhum produto encontrado para "{searchQuery}"</p>
+            </div>
+          )}
+        </div>
       ) : (
-         <div className="text-center py-32 bg-white">
-            <TagIcon className="mx-auto h-12 w-12 text-amber-50" />
-            <h3 className="mt-6 text-sm font-medium text-amber-300 uppercase tracking-widest">Nenhum produto listado</h3>
+         <div className="text-center py-20 bg-white rounded-3xl border border-dashed border-orange-200">
+            <TagIcon className="mx-auto h-10 w-10 text-orange-100" />
+            <p className="mt-2 text-xs font-bold text-orange-200 uppercase tracking-widest">Nenhum produto listado</p>
          </div>
       )}
-      </div>
 
       {modalProduct && <ProductModal product={modalProduct} onSave={handleSave} onClose={() => setModalProduct(null)} />}
     </div>

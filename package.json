@@ -4,17 +4,19 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "tsx server.ts",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "lint": "tsc --noEmit"
   },
   "dependencies": {
-    "react": "^19.2.0",
-    "react-dom": "^19.2.0",
-    "express": "^5.1.0",
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
-    "pg": "^8.16.3"
+    "express": "^5.1.0",
+    "pg": "^8.16.3",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "tsx": "^4.21.0"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",

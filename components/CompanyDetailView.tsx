@@ -6,6 +6,7 @@ import Card from './common/Card';
 import Input from './common/Input';
 import Button from './common/Button';
 import FinancialParameters from './FinancialParameters';
+import { maskCPF, maskCNPJ, maskPhone, maskCEP, formatCurrency, parseCurrency } from '../src/lib/masks';
 
 interface CompanyDetailViewProps {
   company: Company;
@@ -14,6 +15,24 @@ interface CompanyDetailViewProps {
   onUpdateProductSettings: (companyId: string, settings: CompanyProductSetting[]) => void;
   onBack: () => void;
 }
+
+/**
+ * ==============================================================================
+ * DOCUMENTAÇÃO DE NEGÓCIO - DETALHES DO CLIENTE
+ * ==============================================================================
+ * 
+ * 1. DADOS GERAIS:
+ *    - Cadastro completo com máscaras de CPF/CNPJ, CEP e Telefone.
+ * 
+ * 2. PREÇO (PRODUCT SETTINGS):
+ *    - Implementa máscara de moeda brasileira (R$ X,00).
+ *    - O usuário edita apenas a parte inteira do valor.
+ *    - Produtos desmarcados ('buys' == false) têm o campo de preço desabilitado.
+ * 
+ * 3. CONFIGURAÇÃO DE COMPRA:
+ *    - Gerencia pedidos recorrentes e parâmetros financeiros (margens/taxas).
+ * ==============================================================================
+ */
 
 const CompanyDetailView: React.FC<CompanyDetailViewProps> = ({ company, products, onUpdate, onUpdateProductSettings, onBack }) => {
   const [activeTab, setActiveTab] = useState<'dadosGerais' | 'preco' | 'configuracaoCompra'>('dadosGerais');
@@ -39,12 +58,12 @@ const CompanyDetailView: React.FC<CompanyDetailViewProps> = ({ company, products
   return (
     <div className="animate-fade-in">
       {/* Header */}
-      <header className="mb-8">
-        <button onClick={onBack} className="flex items-center text-sm text-amber-600 hover:text-amber-800 mb-2">
-          <ChevronLeftIcon className="h-5 w-5 mr-1" />
-          Voltar para Empresas
+      <header className="mb-4">
+        <button onClick={onBack} className="flex items-center text-[10px] font-bold uppercase tracking-widest text-amber-600 hover:text-amber-800 mb-1">
+          <ChevronLeftIcon className="h-4 w-4 mr-1" />
+          Voltar
         </button>
-        <h1 className="text-3xl font-bold text-amber-800">{company.name}</h1>
+        <h1 className="text-xl font-black text-amber-900">{company.name}</h1>
       </header>
       
       {/* Tabs */}
@@ -160,54 +179,60 @@ const ProductSettingsTab = ({ company, allProducts, onUpdate }: { company: Compa
     });
 
     return (
-        <Card>
-            <div className="p-8">
-                <h3 className="text-xl font-semibold text-amber-800 mb-2">Preços de Produtos para {company.name}</h3>
-                <p className="text-sm text-amber-600 mb-6">Defina quais produtos esta empresa compra e o preço específico para cada um.</p>
+        <Card className="p-4 rounded-xl">
+            <div>
+                <h3 className="text-sm font-black text-amber-900 mb-1 uppercase tracking-tight">Preços de Produtos</h3>
+                <p className="text-[10px] text-amber-600 mb-4">Defina quais produtos esta empresa compra e o preço específico.</p>
                 <div className="overflow-x-auto">
                     <table className="w-full text-left">
-                        <thead className="border-b-2 border-orange-200">
+                        <thead className="border-b border-orange-100">
                             <tr>
-                                <th className="p-4 text-sm font-semibold text-amber-700">Produto</th>
-                                <th className="p-4 text-sm font-semibold text-amber-700 w-32 text-center">Compra</th>
-                                <th className="p-4 text-sm font-semibold text-amber-700 w-48">Preço (R$)</th>
+                                <th className="pb-2 text-[10px] font-bold text-amber-800/40 uppercase tracking-widest">Produto</th>
+                                <th className="pb-2 text-[10px] font-bold text-amber-800/40 uppercase tracking-widest w-20 text-center">Compra</th>
+                                <th className="pb-2 text-[10px] font-bold text-amber-800/40 uppercase tracking-widest w-32">Preço (R$)</th>
                             </tr>
                         </thead>
-                        <tbody>
+                        <tbody className="divide-y divide-orange-50/30">
                             {mergedSettings.map(({ product, setting }) => (
-                                <tr key={product.id} className="border-b border-orange-100">
-                                    <td className="p-4 font-medium text-gray-800">{product.name}</td>
-                                    <td className="p-4 text-center">
+                                <tr key={product.id} className="hover:bg-orange-50/10 transition-colors">
+                                    <td className="py-2 font-bold text-amber-900 text-xs">{product.name}</td>
+                                    <td className="py-2 text-center">
                                         <input
                                             type="checkbox"
                                             checked={setting.buys}
                                             onChange={(e) => handleSettingChange(product.id, 'buys', e.target.checked)}
-                                            className="h-5 w-5 rounded border-gray-300 text-orange-600 focus:ring-orange-500 cursor-pointer"
+                                            className="h-4 w-4 rounded border-orange-200 text-orange-600 focus:ring-orange-500 cursor-pointer"
                                         />
                                     </td>
-                                    <td className="p-4">
-                                        <Input
-                                            label=""
-                                            type="number"
-                                            step="0.01"
-                                            min="0"
-                                            value={setting.price}
-                                            onChange={(e) => handleSettingChange(product.id, 'price', parseFloat(e.target.value))}
-                                            disabled={!setting.buys}
-                                            className="w-full disabled:bg-gray-200"
-                                        />
+                                    <td className="py-2">
+                                        <div className={`flex items-center bg-orange-50/30 border border-orange-100 rounded-lg px-2 py-1 focus-within:ring-2 focus-within:ring-orange-500 transition-all ${!setting.buys ? 'opacity-30' : ''}`}>
+                                            <span className="text-[10px] font-black text-amber-900/40 mr-1 select-none">R$</span>
+                                            <input
+                                                type="text"
+                                                value={setting.price === 0 ? '' : setting.price.toString()}
+                                                onChange={(e) => {
+                                                    const val = e.target.value.replace(/\D/g, '');
+                                                    const num = val === '' ? 0 : parseInt(val, 10);
+                                                    handleSettingChange(product.id, 'price', num);
+                                                }}
+                                                disabled={!setting.buys}
+                                                placeholder="0"
+                                                className="w-full bg-transparent text-xs font-bold text-amber-900 outline-none placeholder:text-amber-900/20 text-right"
+                                            />
+                                            <span className="text-xs font-bold text-amber-900/40 ml-0.5">,00</span>
+                                        </div>
                                     </td>
                                 </tr>
                             ))}
                         </tbody>
                     </table>
                 </div>
-                 <div className="mt-8 flex justify-end gap-4 border-t border-orange-100 pt-6">
-                    <Button type="button" variant="secondary" onClick={handleCancel} disabled={!hasChanges}>
+                 <div className="mt-4 flex justify-end gap-2 border-t border-orange-100 pt-4">
+                    <Button type="button" variant="secondary" onClick={handleCancel} disabled={!hasChanges} className="text-[10px] px-3 py-1.5">
                         Cancelar
                     </Button>
-                    <Button type="button" onClick={handleSave} disabled={!hasChanges}>
-                        Salvar Alterações
+                    <Button type="button" onClick={handleSave} disabled={!hasChanges} className="text-[10px] px-3 py-1.5">
+                        Salvar
                     </Button>
                 </div>
             </div>
@@ -228,9 +253,21 @@ const GeneralDataTab = ({ company, onUpdate }: { company: Company, onUpdate: (c:
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type, checked } = e.target;
+    let maskedValue = value;
+
+    if (type === 'checkbox') {
+      setFormData(prev => ({ ...prev, [name]: checked }));
+      return;
+    }
+
+    if (name === 'cpf') maskedValue = maskCPF(value);
+    if (name === 'cnpj') maskedValue = maskCNPJ(value);
+    if (name === 'phone') maskedValue = maskPhone(value);
+    if (name === 'cep') maskedValue = maskCEP(value);
+
     setFormData(prev => ({ 
       ...prev, 
-      [name]: type === 'checkbox' ? checked : value 
+      [name]: maskedValue 
     }));
   };
 
@@ -243,10 +280,15 @@ const GeneralDataTab = ({ company, onUpdate }: { company: Company, onUpdate: (c:
       if (!response.ok) throw new Error('Erro ao consultar a API de CEP.');
       const data = await response.json();
       if (data.erro) {
-        setFormData(prev => ({ ...prev, address: '' }));
+        setFormData(prev => ({ ...prev, address: '', bairro: '', municipio: '', uf: '' }));
       } else {
-        const fullAddress = [data.logradouro, data.bairro, data.localidade, data.uf].filter(Boolean).join(', ');
-        setFormData(prev => ({ ...prev, address: fullAddress }));
+        setFormData(prev => ({ 
+          ...prev, 
+          address: data.logradouro || '',
+          bairro: data.bairro || '',
+          municipio: data.localidade || '',
+          uf: data.uf || ''
+        }));
       }
     } catch (error) {
       console.error('Falha ao buscar CEP:', error);
@@ -265,62 +307,110 @@ const GeneralDataTab = ({ company, onUpdate }: { company: Company, onUpdate: (c:
   };
 
   return (
-    <Card>
-      <div className="p-8">
-        <div className="flex justify-between items-center mb-6">
-            <h3 className="text-xl font-semibold text-amber-800">Dados Gerais da Empresa</h3>
+    <Card className="p-4 rounded-xl">
+      <div>
+        <div className="flex justify-between items-center mb-4">
+            <h3 className="text-sm font-black text-amber-900 uppercase tracking-tight">Dados Gerais</h3>
             {!isEditing && (
-                <button onClick={() => setIsEditing(true)} className="flex items-center text-sm font-medium text-blue-600 hover:text-blue-800">
-                    <PencilIcon className="h-4 w-4 mr-1" />
+                <Button onClick={() => setIsEditing(true)} variant="secondary" className="px-3 py-1 text-[10px]">
+                    <PencilIcon className="h-3 w-3 mr-1" />
                     Editar
-                </button>
+                </Button>
             )}
         </div>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
-            <InfoField label="Nome da Empresa" value={formData.name} name="name" isEditing={isEditing} onChange={handleChange} />
-            <InfoField label="CNPJ" value={formData.cnpj} name="cnpj" isEditing={isEditing} onChange={handleChange} onBlur={handleCepBlur} />
-            <InfoField label="CEP" value={formData.cep} name="cep" isEditing={isEditing} onChange={handleChange} onBlur={handleCepBlur} />
-            <InfoField label="Telefone" value={formData.phone} name="phone" isEditing={isEditing} onChange={handleChange} />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-3">
             <div className="md:col-span-2">
-               <InfoField 
-                  label={isLoadingCep ? "Buscando endereço..." : "Endereço"} 
-                  value={formData.address} 
-                  name="address" 
-                  isEditing={isEditing} 
-                  onChange={handleChange}
-                  disabled={isLoadingCep}
-                  placeholder={isLoadingCep ? "Aguarde..." : "Preenchido automaticamente pelo CEP"}
-               />
+                {isEditing ? (
+                    <div className="flex gap-4 p-1 bg-orange-50/50 rounded-xl border border-orange-100 max-w-xs">
+                        <button
+                            type="button"
+                            onClick={() => setFormData(prev => ({ ...prev, type: 'PJ' }))}
+                            className={`flex-1 py-1.5 text-[9px] font-black uppercase tracking-widest rounded-lg transition-all ${
+                                formData.type === 'PJ' ? 'bg-white text-orange-600 shadow-sm' : 'text-amber-900/40 hover:text-amber-900/60'
+                            }`}
+                        >
+                            PJ
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setFormData(prev => ({ ...prev, type: 'PF' }))}
+                            className={`flex-1 py-1.5 text-[9px] font-black uppercase tracking-widest rounded-lg transition-all ${
+                                formData.type === 'PF' ? 'bg-white text-orange-600 shadow-sm' : 'text-amber-900/40 hover:text-amber-900/60'
+                            }`}
+                        >
+                            PF
+                        </button>
+                    </div>
+                ) : (
+                    <div>
+                        <p className="block text-[10px] font-bold text-amber-800/40 mb-0.5 uppercase tracking-widest">Tipo de Cliente</p>
+                        <span className="text-[9px] bg-amber-50 text-amber-600 px-2 py-1 rounded-md font-bold uppercase border border-amber-100">
+                            {formData.type === 'PF' ? 'Pessoa Física (PF)' : 'Pessoa Jurídica (PJ)'}
+                        </span>
+                    </div>
+                )}
             </div>
+            <InfoField label="Nome do Cliente" value={formData.name} name="name" isEditing={isEditing} onChange={handleChange} />
+            {formData.type === 'PJ' ? (
+                <InfoField label="CNPJ" value={formData.cnpj || ''} name="cnpj" isEditing={isEditing} onChange={handleChange} />
+            ) : (
+                <InfoField label="CPF" value={formData.cpf || ''} name="cpf" isEditing={isEditing} onChange={handleChange} />
+            )}
+            <div className="grid grid-cols-12 gap-2 md:col-span-2">
+              <div className="col-span-3">
+                <InfoField label="CEP" value={formData.cep} name="cep" isEditing={isEditing} onChange={handleChange} onBlur={handleCepBlur} />
+              </div>
+              <div className="col-span-7">
+                <InfoField 
+                    label={isLoadingCep ? "Buscando..." : "Endereço"} 
+                    value={formData.address} 
+                    name="address" 
+                    isEditing={isEditing} 
+                    onChange={handleChange}
+                    disabled={isLoadingCep}
+                    placeholder={isLoadingCep ? "Aguarde..." : "Endereço completo"}
+                />
+              </div>
+              <div className="col-span-2">
+                <InfoField label="Número" value={formData.number || ''} name="number" isEditing={isEditing} onChange={handleChange} />
+              </div>
+            </div>
+            <div className="grid grid-cols-3 gap-2 md:col-span-2">
+              <InfoField label="Bairro" value={formData.bairro || ''} name="bairro" isEditing={isEditing} onChange={handleChange} disabled={isLoadingCep} />
+              <InfoField label="UF" value={formData.uf || ''} name="uf" isEditing={isEditing} onChange={handleChange} disabled={isLoadingCep} />
+              <InfoField label="Município" value={formData.municipio || ''} name="municipio" isEditing={isEditing} onChange={handleChange} disabled={isLoadingCep} />
+            </div>
+            <InfoField label="Telefone" value={formData.phone} name="phone" isEditing={isEditing} onChange={handleChange} />
             
-            {/* Boxes de Opções (Venda na Porta e Agendamento) */}
-            <div className="md:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-6 mt-2">
+            {/* Boxes de Opções (Venda na Porta, Agendamento e Emite NF) */}
+            <div className="md:col-span-2 grid grid-cols-1 sm:grid-cols-3 gap-3 mt-1">
                 <div>
                     {isEditing ? (
-                        <div className="flex items-center gap-2 h-[42px]">
+                        <div className="flex items-center gap-2 h-8">
                             <input 
                                 type="checkbox" 
                                 id="doorSale" 
                                 name="doorSale" 
                                 checked={formData.doorSale} 
                                 onChange={handleChange}
-                                className="h-5 w-5 rounded border-orange-300 text-orange-600 focus:ring-orange-500 cursor-pointer"
+                                className="h-4 w-4 rounded border-orange-300 text-orange-600 focus:ring-orange-500 cursor-pointer"
                             />
-                            <label htmlFor="doorSale" className="text-sm font-medium text-amber-700 cursor-pointer">Venda na porta</label>
+                            <label htmlFor="doorSale" className="text-[10px] font-bold text-amber-700 cursor-pointer uppercase tracking-tight">Venda na porta</label>
                         </div>
                     ) : (
                         <div>
-                            <p className="block text-sm font-medium text-amber-700 mb-1">Venda na porta</p>
-                            <div className="flex items-center gap-2 text-gray-800 bg-gray-100/50 px-4 py-2 rounded-md min-h-[42px]">
-                                {formData.doorSale ? (
-                                    <span className="flex items-center gap-1 text-green-700 font-bold text-sm">
-                                        <CheckCircleIcon className="h-5 w-5" />
-                                        Sim
-                                    </span>
-                                ) : (
-                                    <span className="text-gray-500 text-sm italic">Não</span>
-                                )}
+                            <p className="block text-[10px] font-bold text-amber-800/40 mb-0.5 uppercase tracking-widest">Venda na porta</p>
+                            <div className="flex items-center gap-2 text-amber-900 bg-orange-50/30 px-3 py-1.5 rounded-lg">
+                                <input 
+                                    type="checkbox" 
+                                    checked={formData.doorSale} 
+                                    readOnly 
+                                    className="h-4 w-4 rounded border-orange-200 text-orange-600 focus:ring-orange-500 cursor-default"
+                                />
+                                <span className={`text-[10px] font-black uppercase ${formData.doorSale ? 'text-amber-900' : 'text-gray-300'}`}>
+                                    {formData.doorSale ? 'Sim' : 'Não'}
+                                </span>
                             </div>
                         </div>
                     )}
@@ -328,29 +418,61 @@ const GeneralDataTab = ({ company, onUpdate }: { company: Company, onUpdate: (c:
 
                 <div>
                     {isEditing ? (
-                        <div className="flex items-center gap-2 h-[42px]">
+                        <div className="flex items-center gap-2 h-8">
                             <input 
                                 type="checkbox" 
                                 id="orderScheduling" 
                                 name="orderScheduling" 
                                 checked={formData.orderScheduling} 
                                 onChange={handleChange}
-                                className="h-5 w-5 rounded border-orange-300 text-orange-600 focus:ring-orange-500 cursor-pointer"
+                                className="h-4 w-4 rounded border-orange-300 text-orange-600 focus:ring-orange-500 cursor-pointer"
                             />
-                            <label htmlFor="orderScheduling" className="text-sm font-medium text-amber-700 cursor-pointer">Agendamento de pedidos</label>
+                            <label htmlFor="orderScheduling" className="text-[10px] font-bold text-amber-700 cursor-pointer uppercase tracking-tight">Agendamento</label>
                         </div>
                     ) : (
                         <div>
-                            <p className="block text-sm font-medium text-amber-700 mb-1">Agendamento de pedidos</p>
-                            <div className="flex items-center gap-2 text-gray-800 bg-gray-100/50 px-4 py-2 rounded-md min-h-[42px]">
-                                {formData.orderScheduling ? (
-                                    <span className="flex items-center gap-1 text-green-700 font-bold text-sm">
-                                        <CheckCircleIcon className="h-5 w-5" />
-                                        Sim
-                                    </span>
-                                ) : (
-                                    <span className="text-gray-500 text-sm italic">Não</span>
-                                )}
+                            <p className="block text-[10px] font-bold text-amber-800/40 mb-0.5 uppercase tracking-widest">Agendamento</p>
+                            <div className="flex items-center gap-2 text-amber-900 bg-orange-50/30 px-3 py-1.5 rounded-lg">
+                                <input 
+                                    type="checkbox" 
+                                    checked={formData.orderScheduling} 
+                                    readOnly 
+                                    className="h-4 w-4 rounded border-orange-200 text-orange-600 focus:ring-orange-500 cursor-default"
+                                />
+                                <span className={`text-[10px] font-black uppercase ${formData.orderScheduling ? 'text-amber-900' : 'text-gray-300'}`}>
+                                    {formData.orderScheduling ? 'Sim' : 'Não'}
+                                </span>
+                            </div>
+                        </div>
+                    )}
+                </div>
+
+                <div>
+                    {isEditing ? (
+                        <div className="flex items-center gap-2 h-8">
+                            <input 
+                                type="checkbox" 
+                                id="emiteNF" 
+                                name="emiteNF" 
+                                checked={formData.emiteNF} 
+                                onChange={handleChange}
+                                className="h-4 w-4 rounded border-orange-300 text-orange-600 focus:ring-orange-500 cursor-pointer"
+                            />
+                            <label htmlFor="emiteNF" className="text-[10px] font-bold text-amber-700 cursor-pointer uppercase tracking-tight">Emite NF?</label>
+                        </div>
+                    ) : (
+                        <div>
+                            <p className="block text-[10px] font-bold text-amber-800/40 mb-0.5 uppercase tracking-widest">Emite NF?</p>
+                            <div className="flex items-center gap-2 text-amber-900 bg-orange-50/30 px-3 py-1.5 rounded-lg">
+                                <input 
+                                    type="checkbox" 
+                                    checked={formData.emiteNF} 
+                                    readOnly 
+                                    className="h-4 w-4 rounded border-orange-200 text-orange-600 focus:ring-orange-500 cursor-default"
+                                />
+                                <span className={`text-[10px] font-black uppercase ${formData.emiteNF ? 'text-amber-900' : 'text-gray-300'}`}>
+                                    {formData.emiteNF ? 'Sim' : 'Não'}
+                                </span>
                             </div>
                         </div>
                     )}
@@ -359,9 +481,9 @@ const GeneralDataTab = ({ company, onUpdate }: { company: Company, onUpdate: (c:
         </div>
 
         {isEditing && (
-            <div className="mt-8 flex justify-end gap-4 border-t border-orange-100 pt-6">
-                <Button type="button" variant="secondary" onClick={handleCancel}>Cancelar</Button>
-                <Button type="button" onClick={handleSave}>Salvar Alterações</Button>
+            <div className="mt-6 flex justify-end gap-2 border-t border-orange-100 pt-4">
+                <Button type="button" variant="secondary" onClick={handleCancel} className="text-[10px] px-3 py-1.5">Cancelar</Button>
+                <Button type="button" onClick={handleSave} className="text-[10px] px-3 py-1.5">Salvar</Button>
             </div>
         )}
       </div>
@@ -373,12 +495,12 @@ const GeneralDataTab = ({ company, onUpdate }: { company: Company, onUpdate: (c:
 // Helper component for displaying fields
 const InfoField = ({ label, value, name, isEditing, onChange, ...props }: { label: string, value: string, name: string, isEditing: boolean, onChange: (e: React.ChangeEvent<HTMLInputElement>) => void, [x:string]: any }) => {
     if (isEditing) {
-        return <Input label={label} name={name} value={value} onChange={onChange} {...props} />;
+        return <Input label={label} name={name} value={value} onChange={onChange} className="text-xs" {...props} />;
     }
     return (
         <div>
-            <p className="block text-sm font-medium text-amber-700 mb-1">{label}</p>
-            <p className="text-gray-800 bg-gray-100/50 px-4 py-2 rounded-md min-h-[42px]">{value || '-'}</p>
+            <p className="block text-[10px] font-bold text-amber-800/40 mb-0.5 uppercase tracking-widest">{label}</p>
+            <p className="text-amber-900 bg-orange-50/30 px-3 py-1.5 rounded-lg text-xs font-bold min-h-[32px] flex items-center">{value || '-'}</p>
         </div>
     );
 }

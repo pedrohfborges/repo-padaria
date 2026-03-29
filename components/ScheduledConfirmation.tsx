@@ -1,16 +1,32 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Company, Order, OrderItem, Product } from '../types';
 import Card from './common/Card';
 import Button from './common/Button';
 import { CheckCircleIcon, CalendarDaysIcon, PaperAirplaneIcon, TrashIcon, PencilSquareIcon, XMarkIcon, PlusIcon } from './Icons';
+import { getYesterdayRecurringPJOrders, QueueItem, getYesterdayDateStr } from '../src/services/orderService';
 
-const getLocalDateStr = (date: Date) => {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-};
+/**
+ * ==============================================================================
+ * DOCUMENTAÇÃO DE NEGÓCIO - CONFERÊNCIA DE PEDIDOS RECORRENTES (PJ)
+ * ==============================================================================
+ * 
+ * 1. FLUXO DE TRABALHO:
+ *    - Esta aba funciona como uma "API de Produção" que consolida todos os
+ *      pedidos de clientes CNPJ (PJ) que possuem agendamento ativo.
+ *    - O foco é o fechamento da produção de ONTEM para lançamento no histórico.
+ * 
+ * 2. REGRAS DE EXIBIÇÃO:
+ *    - Apenas Clientes PJ.
+ *    - Apenas com 'orderScheduling' = true.
+ *    - Data fixa: Ontem (conforme solicitado pelo usuário).
+ * 
+ * 3. AÇÕES:
+ *    - Editar: Permite ajustar quantidades antes de oficializar.
+ *    - Confirmar: Move o pedido do estado 'pendente/previsão' para o histórico
+ *      do cliente como 'confirmado'.
+ * ==============================================================================
+ */
 
 const EditOrderModal = ({ order, products, onSave, onClose }: any) => {
   const [items, setItems] = useState<Omit<OrderItem, 'id'>[]>(
@@ -39,40 +55,40 @@ const EditOrderModal = ({ order, products, onSave, onClose }: any) => {
   };
 
   return (
-    <div className="fixed inset-0 bg-amber-900/40 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in">
-      <Card className="w-full max-w-lg shadow-2xl border-none">
-        <div className="p-6 border-b border-orange-50 flex justify-between items-center bg-white rounded-t-xl">
-          <div className="flex items-center gap-3">
-            <img src={order.company.logoUrl} className="h-10 w-10 rounded-lg object-cover" />
-            <h3 className="text-lg font-black text-amber-900">Editar Pedido - {order.company.name}</h3>
+    <div className="fixed inset-0 bg-amber-900/20 z-50 flex items-center justify-center p-4 backdrop-blur-[2px] animate-fade-in">
+      <Card className="w-full max-w-md shadow-xl border-none rounded-xl overflow-hidden">
+        <div className="p-4 border-b border-orange-50 flex justify-between items-center bg-white">
+          <div className="flex items-center gap-2">
+            <img src={order.company.logoUrl} className="h-8 w-8 rounded-lg object-cover" />
+            <h3 className="text-sm font-black text-amber-900 uppercase tracking-tight">Editar Pedido</h3>
           </div>
-          <button onClick={onClose} className="text-amber-400 hover:text-amber-600"><XMarkIcon className="h-6 w-6" /></button>
+          <button onClick={onClose} className="text-amber-400 hover:text-amber-600"><XMarkIcon className="h-5 w-5" /></button>
         </div>
-        <form onSubmit={handleSubmit} className="p-8 space-y-5 bg-white rounded-b-xl max-h-[70vh] overflow-y-auto">
-          <div className="space-y-3">
+        <form onSubmit={handleSubmit} className="p-4 space-y-4 bg-white max-h-[70vh] overflow-y-auto">
+          <div className="space-y-2">
             {items.map((item, index) => (
               <div key={index} className="flex gap-2 items-end">
                 <div className="flex-1">
                   <select 
                     value={item.productName} 
                     onChange={e => handleItemChange(index, 'productName', e.target.value)}
-                    className="w-full px-3 py-2 bg-orange-50/30 border border-orange-100 rounded-lg text-sm"
+                    className="w-full px-2 py-1.5 bg-orange-50/30 border border-orange-100 rounded-lg text-xs font-bold text-amber-900 outline-none focus:ring-1 focus:ring-orange-500"
                   >
                     <option value="">Produto...</option>
                     {products.map((p: any) => <option key={p.id} value={p.name}>{p.name}</option>)}
                   </select>
                 </div>
-                <div className="w-20">
-                  <input type="number" value={item.quantity} onChange={e => handleItemChange(index, 'quantity', e.target.value)} className="w-full px-3 py-2 border rounded-lg text-center font-black" />
+                <div className="w-16">
+                  <input type="number" value={item.quantity} onChange={e => handleItemChange(index, 'quantity', e.target.value)} className="w-full px-2 py-1.5 border border-orange-100 rounded-lg text-center font-black text-xs text-amber-900 outline-none focus:ring-1 focus:ring-orange-500" />
                 </div>
-                <button type="button" onClick={() => removeItem(index)} className="text-red-300 p-2"><TrashIcon className="h-5 w-5" /></button>
+                <button type="button" onClick={() => removeItem(index)} className="text-red-300 hover:text-red-500 p-1.5"><TrashIcon className="h-4 w-4" /></button>
               </div>
             ))}
-            <button type="button" onClick={addItem} className="text-xs font-black text-orange-600 flex items-center gap-1"><PlusIcon className="h-4 w-4" /> ADICIONAR ITEM</button>
+            <button type="button" onClick={addItem} className="text-[10px] font-black text-orange-600 flex items-center gap-1 uppercase tracking-widest hover:text-orange-700 transition-colors"><PlusIcon className="h-3 w-3" /> ADICIONAR ITEM</button>
           </div>
-          <div className="pt-6 flex gap-3">
-            <Button type="button" variant="secondary" onClick={onClose} className="flex-1">Cancelar</Button>
-            <Button type="submit" className="flex-1">Salvar Alterações</Button>
+          <div className="pt-4 flex gap-2 border-t border-orange-50">
+            <Button type="button" variant="secondary" onClick={onClose} className="flex-1 text-[10px] py-2">Cancelar</Button>
+            <Button type="submit" className="flex-1 text-[10px] py-2">Salvar</Button>
           </div>
         </form>
       </Card>
@@ -89,49 +105,49 @@ interface ScheduledConfirmationProps {
 }
 
 const ScheduledConfirmation: React.FC<ScheduledConfirmationProps> = ({ companies, products, onConfirmAllQueue, onDeleteOrder, onAddManualOrder }) => {
-  const [editingItem, setEditingItem] = useState<any>(null);
+  const [editingItem, setEditingItem] = useState<QueueItem | null>(null);
+  const [allQueueItems, setAllQueueItems] = useState<QueueItem[]>([]);
 
-  const tomorrowStr = getLocalDateStr(new Date(Date.now() + 86400000));
-  const tomorrowDay = new Date(Date.now() + 86400000).getDay();
+  // Carrega os dados da "API" (Service)
+  useEffect(() => {
+    const items = getYesterdayRecurringPJOrders(companies);
+    setAllQueueItems(items);
+  }, [companies]);
 
-  // Pedidos reais pendentes (manuais ou já gerados) - EXCLUI VENDAS NA PORTA
-  const pendingOrders = companies.flatMap(c => 
-    c.orders.filter(o => o.status === 'pending' && !o.isDoorSale).map(o => ({ company: c, order: o, isDraft: false }))
-  );
-
-  // Previsões para amanhã baseadas na recorrência - Apenas para empresas com Agendamento de Pedidos ATIVO
-  const draftOrders = companies
-    .filter(c => {
-      if (!c.orderScheduling || !c.recurringOrder || c.orders.some(o => o.date === tomorrowStr)) return false;
-      const { type, daysOfWeek } = c.recurringOrder.recurrence;
-      return daysOfWeek?.includes(tomorrowDay) || type === 'daily' || (type === 'weekdays' && tomorrowDay >= 1 && tomorrowDay <= 5);
-    })
-    .map(c => ({
-      company: c,
-      order: {
-        id: `draft-${c.id}`,
-        date: tomorrowStr,
-        items: c.recurringOrder!.items,
-        status: 'pending' as const
-      },
-      isDraft: true
-    }));
-
-  const allQueueItems = [...pendingOrders, ...draftOrders].sort((a, b) => a.order.date.localeCompare(b.order.date));
+  // Resumo de Produção (Soma de todos os itens da fila)
+  const productionSummary = allQueueItems.reduce((acc: Record<string, number>, item) => {
+    item.order.items.forEach((it: any) => {
+      acc[it.productName] = (acc[it.productName] || 0) + it.quantity;
+    });
+    return acc;
+  }, {});
 
   const handleConfirmAll = () => {
     if (allQueueItems.length === 0) return;
     
-    // Passamos todos os dados necessários para o App.tsx processar
+    const drafts = allQueueItems.filter(i => i.isDraft).map(d => ({ 
+      companyId: d.company.id, 
+      order: { ...d.order, items: d.order.items.map(it => ({ ...it, id: Math.random().toString() })) } 
+    }));
+
+    const existing = allQueueItems.filter(i => !i.isDraft).map(p => ({ 
+      companyId: p.company.id, 
+      orderId: p.order.id 
+    }));
+
+    onConfirmAllQueue({ drafts, existing });
+  };
+
+  const handleConfirmIndividual = (item: QueueItem) => {
     onConfirmAllQueue({
-      drafts: draftOrders.map(d => ({ 
-        companyId: d.company.id, 
-        order: { ...d.order, items: d.order.items.map(it => ({ ...it, id: Math.random().toString() })) } 
-      })),
-      existing: pendingOrders.map(p => ({ 
-        companyId: p.company.id, 
-        orderId: p.order.id 
-      }))
+      drafts: item.isDraft ? [{ 
+        companyId: item.company.id, 
+        order: { ...item.order, items: item.order.items.map((it: any) => ({ ...it, id: Math.random().toString() })) } 
+      }] : [],
+      existing: !item.isDraft ? [{ 
+        companyId: item.company.id, 
+        orderId: item.order.id 
+      }] : []
     });
   };
 
@@ -145,103 +161,120 @@ const ScheduledConfirmation: React.FC<ScheduledConfirmationProps> = ({ companies
     }, editingItem.company.id);
   };
 
+  const yesterdayFormatted = new Date();
+  yesterdayFormatted.setDate(yesterdayFormatted.getDate() - 1);
+  const displayDate = yesterdayFormatted.toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' });
+
   return (
-    <div className="space-y-6 animate-fade-in max-w-5xl mx-auto pb-10">
+    <div className="space-y-4 animate-fade-in max-w-4xl mx-auto pb-10">
       {editingItem && <EditOrderModal order={editingItem} products={products} onSave={handleSaveEdit} onClose={() => setEditingItem(null)} />}
 
-      {/* Cabeçalho com o Botão 'Box' Estilizado conforme print */}
-      <div className="flex flex-col sm:flex-row justify-between items-center bg-white p-6 rounded-2xl shadow-sm border border-orange-100 gap-6">
+      {/* Cabeçalho Minimalista - Foco em Ontem e PJ */}
+      <div className="flex flex-col sm:flex-row justify-between items-end border-b border-orange-100 pb-4 gap-4">
         <div>
-          <h2 className="text-xl font-black text-amber-900 leading-tight">Fila de Produção</h2>
-          <p className="text-xs font-bold text-amber-500 uppercase tracking-tighter">PEDIDOS ATIVOS E PREVISÕES</p>
+          <h2 className="text-lg font-bold text-amber-900 tracking-tight">Conferência PJ (Ontem)</h2>
+          <p className="text-[10px] font-bold text-amber-500 uppercase tracking-widest mt-1">
+            Pedidos Recorrentes de {displayDate}
+          </p>
         </div>
         
-        {/* Botão de Confirmação Principal conforme o Print - Ajustado Ícone */}
-        <button 
-          onClick={handleConfirmAll}
-          disabled={allQueueItems.length === 0}
-          className="flex flex-col items-center justify-center p-5 bg-white border-2 border-black rounded-xl hover:bg-orange-50 transition-all disabled:opacity-30 disabled:grayscale group min-w-[280px]"
-        >
-          <PaperAirplaneIcon className="h-7 w-7 text-black mb-2" />
-          <span className="text-sm font-bold text-black uppercase tracking-tight">
-            Confirmar pedidos de amanhã ({allQueueItems.length})
-          </span>
-        </button>
+        <div className="flex items-center gap-3">
+          <div className="text-right hidden sm:block">
+            <p className="text-[8px] font-bold text-amber-400 uppercase tracking-widest">Empresas na Fila</p>
+            <p className="text-sm font-black text-amber-900">{allQueueItems.length}</p>
+          </div>
+          <Button 
+            onClick={handleConfirmAll}
+            disabled={allQueueItems.length === 0}
+            className="bg-green-600 hover:bg-green-700 text-white border-none px-6 py-2 rounded-xl text-[10px] uppercase font-black"
+          >
+            Confirmar Todos
+          </Button>
+        </div>
       </div>
 
-      {/* Lista de Pedidos em Cards Horizontais Redesenhados */}
-      <div className="space-y-3">
-        {allQueueItems.length === 0 ? (
-          <div className="text-center p-16 bg-white/40 border-2 border-dashed border-orange-100 rounded-3xl">
-            <CheckCircleIcon className="mx-auto h-12 w-12 text-orange-200" />
-            <p className="mt-4 text-sm font-bold text-amber-600">Nenhum pedido na fila de hoje ou amanhã.</p>
-          </div>
-        ) : (
-          allQueueItems.map((item) => (
-            <Card key={item.order.id} className="p-4 border border-orange-50 bg-white hover:border-orange-200 transition-all shadow-sm">
-              <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-                
-                {/* Lado Esquerdo: Info da Empresa */}
-                <div className="flex items-center gap-4 flex-1 w-full">
-                  <div className="relative flex-shrink-0">
-                    <img src={item.company.logoUrl} className="h-14 w-14 rounded-2xl object-cover border border-orange-50 shadow-sm" />
-                    <div className="absolute -bottom-1 -right-1 h-5 w-5 rounded-full border-2 border-white flex items-center justify-center bg-orange-500">
-                       <CalendarDaysIcon className="h-3 w-3 text-white" />
-                    </div>
-                  </div>
-                  
+      {/* Resumo de Produção Discreto */}
+      {allQueueItems.length > 0 && (
+        <div className="bg-orange-50/50 border border-orange-100 rounded-xl p-3 flex flex-wrap gap-4 items-center">
+          <span className="text-[9px] font-black text-orange-600 uppercase tracking-widest border-r border-orange-200 pr-4">Produção Total:</span>
+          {Object.entries(productionSummary).map(([name, qty]) => (
+            <div key={name} className="flex items-center gap-1.5">
+              <span className="text-[10px] font-black text-amber-900">{qty}</span>
+              <span className="text-[9px] font-bold text-amber-500 uppercase tracking-tighter">{name}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Tabela de Conferência */}
+      <div className="bg-white rounded-2xl border border-orange-100 overflow-hidden shadow-sm">
+        <div className="grid grid-cols-12 bg-orange-50/30 border-b border-orange-100 p-3">
+          <div className="col-span-4 text-[9px] font-black text-amber-900/40 uppercase tracking-widest">Cliente (CNPJ)</div>
+          <div className="col-span-5 text-[9px] font-black text-amber-900/40 uppercase tracking-widest">Produtos Agendados</div>
+          <div className="col-span-3 text-right text-[9px] font-black text-amber-900/40 uppercase tracking-widest">Ações</div>
+        </div>
+
+        <div className="divide-y divide-orange-50">
+          {allQueueItems.length === 0 ? (
+            <div className="p-12 text-center">
+              <p className="text-xs font-bold text-amber-900/20 uppercase tracking-widest">Nenhum pedido PJ pendente para ontem</p>
+            </div>
+          ) : (
+            allQueueItems.map((item) => (
+              <div key={item.order.id} className="grid grid-cols-12 p-3 items-center hover:bg-orange-50/20 transition-colors group">
+                {/* Cliente */}
+                <div className="col-span-4 flex items-center gap-3">
+                  <img src={item.company.logoUrl} className="h-8 w-8 rounded-lg object-cover border border-orange-100" />
                   <div className="min-w-0">
-                    <h3 className="text-base font-black text-amber-900 truncate">{item.company.name}</h3>
-                    <div className="mt-1 flex flex-col gap-0.5">
-                      <span className={`inline-block self-start text-[9px] font-black px-1.5 py-0.5 rounded uppercase ${item.isDraft ? 'bg-amber-100 text-amber-700' : 'bg-orange-100 text-orange-700'}`}>
-                        {item.isDraft ? 'PREVISÃO' : 'PENDENTE'}
-                      </span>
-                      <p className="text-[10px] font-black text-orange-400 uppercase mt-0.5">
-                        {new Date(item.order.date + 'T12:00:00Z').toLocaleDateString('pt-BR', { day: '2-digit', month: 'long' })}
-                      </p>
-                    </div>
+                    <p className="text-xs font-bold text-amber-900 truncate">{item.company.name}</p>
+                    <p className="text-[7px] font-black text-amber-400 uppercase">{item.company.cnpj || 'CNPJ não informado'}</p>
                   </div>
                 </div>
 
-                {/* Centro: Produtos em Chips Estilizados */}
-                <div className="flex flex-wrap gap-1.5 flex-[2] justify-start md:justify-center w-full">
+                {/* Produtos */}
+                <div className="col-span-5 flex flex-wrap gap-2">
                   {item.order.items.map((it: any, idx: number) => (
-                    <div key={idx} className="bg-orange-50/70 px-3 py-1.5 rounded-full border border-orange-100/50 flex items-center gap-2">
-                      <span className="text-[11px] font-bold text-amber-800">{it.productName}</span>
-                      <span className="text-[11px] font-black text-orange-600">{it.quantity}</span>
+                    <div key={idx} className="flex items-center gap-1">
+                      <span className="text-[10px] font-black text-amber-900">{it.quantity}</span>
+                      <span className="text-[9px] font-medium text-amber-600 uppercase tracking-tighter">{it.productName}</span>
                     </div>
                   ))}
                 </div>
 
-                {/* Lado Direito: Ações */}
-                <div className="flex items-center gap-1 w-full md:w-auto justify-end">
+                {/* Ações */}
+                <div className="col-span-3 flex justify-end items-center gap-1">
                   <button 
                     onClick={() => setEditingItem(item)}
-                    className="p-3 text-amber-400 hover:text-amber-600 transition-colors"
-                    title="Editar pedido"
+                    className="p-2 text-amber-300 hover:text-amber-600 transition-colors"
                   >
-                    <PencilSquareIcon className="h-5 w-5" />
+                    <PencilSquareIcon className="h-4 w-4" />
                   </button>
                   
+                  <button 
+                    onClick={() => handleConfirmIndividual(item)}
+                    className="flex items-center gap-1.5 bg-white border border-green-100 text-green-600 px-3 py-1 rounded-lg text-[9px] font-black uppercase hover:bg-green-50 transition-all shadow-sm"
+                  >
+                    <CheckCircleIcon className="h-3.5 w-3.5" />
+                    Confirmar
+                  </button>
+
                   {!item.isDraft && (
                     <button 
                       onClick={() => onDeleteOrder(item.order.id, item.company.id)} 
-                      className="p-3 text-red-200 hover:text-red-400 transition-colors"
-                      title="Remover pedido"
+                      className="p-2 text-red-200 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"
                     >
-                      <TrashIcon className="h-5 w-5" />
+                      <TrashIcon className="h-4 w-4" />
                     </button>
                   )}
                 </div>
-
               </div>
-            </Card>
-          ))
-        )}
+            ))
+          )}
+        </div>
       </div>
-      
+
       <p className="text-center text-[10px] font-black text-amber-200 uppercase tracking-widest pt-8 opacity-40">
-        FIM DA LISTA DE PRODUÇÃO
+        FIM DA LISTA DE PRODUÇÃO PJ
       </p>
     </div>
   );

@@ -23,17 +23,17 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
     };
 
     return (
-        <div className="flex items-center justify-center min-h-screen bg-orange-50 p-4 font-sans">
-            <Card className="w-full max-w-md animate-fade-in shadow-2xl rounded-3xl border-none">
-                <div className="p-10 sm:p-12">
-                    <div className="text-center mb-10">
-                        <div className="h-20 w-20 bg-orange-100 rounded-full mx-auto mb-4 flex items-center justify-center border-4 border-white shadow-sm overflow-hidden">
-                           <img src="https://picsum.photos/seed/engenhodopao/80" alt="Logo Engenho do Pão" className="h-full w-full object-cover"/>
+        <div className="flex items-center justify-center min-h-screen bg-orange-50/30 p-4 font-sans">
+            <Card className="w-full max-w-sm animate-fade-in shadow-xl rounded-2xl border-none overflow-hidden">
+                <div className="p-8 sm:p-10 bg-white">
+                    <div className="text-center mb-8">
+                        <div className="h-16 w-16 bg-orange-50 rounded-full mx-auto mb-3 flex items-center justify-center border-2 border-white shadow-sm overflow-hidden">
+                           <img src="https://picsum.photos/seed/engenhodopao/80" alt="Logo" className="h-full w-full object-cover"/>
                         </div>
-                        <h1 className="text-3xl font-black text-amber-900 tracking-tighter">Engenho do Pão</h1>
-                        <p className="text-amber-600 font-bold text-sm uppercase tracking-widest mt-1">Gestão de Padaria</p>
+                        <h1 className="text-xl font-black text-amber-900 uppercase tracking-tight">Engenho do Pão</h1>
+                        <p className="text-[10px] font-bold text-amber-500 uppercase tracking-widest mt-1 opacity-60">Gestão de Padaria</p>
                     </div>
-                    <form onSubmit={handleSubmit} className="space-y-6">
+                    <form onSubmit={handleSubmit} className="space-y-4">
                         <Input 
                             label="Usuário" 
                             name="username" 
@@ -42,6 +42,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
                             onChange={(e) => setUsername(e.target.value)} 
                             required 
                             autoComplete="username"
+                            className="text-xs"
                         />
                         <Input 
                             label="Senha" 
@@ -52,21 +53,22 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
                             onChange={(e) => setPassword(e.target.value)} 
                             required 
                             autoComplete="current-password"
+                            className="text-xs"
                         />
                         {error && (
-                            <div className="bg-red-50 border border-red-100 p-3 rounded-xl">
-                                <p className="text-xs text-red-600 font-bold text-center">
+                            <div className="bg-red-50 border border-red-100 p-2 rounded-lg">
+                                <p className="text-[10px] text-red-600 font-bold text-center uppercase tracking-tighter">
                                     {error}
                                 </p>
                             </div>
                         )}
-                        <Button type="submit" className="w-full py-4 text-base">
+                        <Button type="submit" className="w-full py-3 text-xs font-black uppercase tracking-widest">
                             Acessar Sistema
                         </Button>
                     </form>
-                     <div className="text-center mt-10 pt-6 border-t border-orange-50">
-                        <p className="text-[10px] font-bold text-amber-400 uppercase tracking-widest">
-                            Acesso restrito a colaboradores
+                     <div className="text-center mt-8 pt-4 border-t border-orange-50">
+                        <p className="text-[9px] font-black text-amber-200 uppercase tracking-widest">
+                            Acesso restrito
                         </p>
                     </div>
                 </div>
