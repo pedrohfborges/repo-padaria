@@ -1,12 +1,12 @@
 
 import React, { useState, useEffect } from 'react';
-import { Company, Product, CompanyProductSetting, FinancialParams, RecurringOrderConfig } from '../types';
-import { PencilIcon, ChevronLeftIcon, CheckCircleIcon } from './Icons';
+import { Company, Product, CompanyProductSetting } from '../types';
+import { PencilIcon, ChevronLeftIcon, CheckCircleIcon, TrashIcon, ExclamationCircleIcon } from './Icons';
 import Card from './common/Card';
 import Input from './common/Input';
 import Button from './common/Button';
-import FinancialParameters from './FinancialParameters';
 import { maskCPF, maskCNPJ, maskPhone, maskCEP, formatCurrency, parseCurrency } from '../src/lib/masks';
+import { validateCPF, validateCNPJ } from '../src/lib/validations';
 
 interface CompanyDetailViewProps {
   company: Company;
@@ -35,25 +35,7 @@ interface CompanyDetailViewProps {
  */
 
 const CompanyDetailView: React.FC<CompanyDetailViewProps> = ({ company, products, onUpdate, onUpdateProductSettings, onBack }) => {
-  const [activeTab, setActiveTab] = useState<'dadosGerais' | 'preco' | 'configuracaoCompra'>('dadosGerais');
-
-  // Ajusta tab ativa se o agendamento for desativado
-  useEffect(() => {
-    if (!company.orderScheduling && activeTab === 'configuracaoCompra') {
-      setActiveTab('dadosGerais');
-    }
-  }, [company.orderScheduling, activeTab]);
-
-  const handleUpdateRecurringOnly = (newRecurring?: RecurringOrderConfig) => {
-    onUpdate({ 
-        ...company, 
-        recurringOrder: newRecurring 
-    });
-  };
-
-  const availableProductsForRecurrence = products.filter(p => 
-    company.productSettings?.some(s => s.productId === p.id && s.buys)
-  );
+  const [activeTab, setActiveTab] = useState<'dadosGerais' | 'preco' | 'pedidoPreferido'>('dadosGerais');
 
   return (
     <div className="animate-fade-in">
@@ -89,20 +71,16 @@ const CompanyDetailView: React.FC<CompanyDetailViewProps> = ({ company, products
           >
             Preço
           </button>
-          
-          {/* Exibe Configuração de Compra apenas se Agendamento estiver ativo */}
-          {company.orderScheduling && (
-            <button
-              onClick={() => setActiveTab('configuracaoCompra')}
-              className={`${
-                activeTab === 'configuracaoCompra'
-                  ? 'border-orange-500 text-orange-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors duration-200`}
-            >
-              Agendamento de Pedidos
-            </button>
-          )}
+          <button
+            onClick={() => setActiveTab('pedidoPreferido')}
+            className={`${
+              activeTab === 'pedidoPreferido'
+                ? 'border-orange-500 text-orange-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors duration-200`}
+          >
+            Pedido Preferido
+          </button>
         </nav>
       </div>
 
@@ -116,17 +94,204 @@ const CompanyDetailView: React.FC<CompanyDetailViewProps> = ({ company, products
                 onUpdate={(newSettings) => onUpdateProductSettings(company.id, newSettings)}
             />
         )}
-        {activeTab === 'configuracaoCompra' && company.orderScheduling && (
-            <FinancialParameters 
-                companyName={company.name}
-                recurringConfig={company.recurringOrder}
-                availableProducts={availableProductsForRecurrence}
-                onUpdate={handleUpdateRecurringOnly}
+        {activeTab === 'pedidoPreferido' && (
+            <PreferredOrderTab 
+                company={company}
+                products={products}
+                onUpdate={(items) => onUpdate({ ...company, preferredOrder: items })}
             />
         )}
       </div>
     </div>
   );
+};
+
+// Sub-component for Preferred Order Tab
+const PreferredOrderTab = ({ company, products, onUpdate }: { company: Company, products: Product[], onUpdate: (preferredOrder: { [day: number]: { morning?: { productName: string, quantity: number }[], afternoon?: { productName: string, quantity: number }[] } }) => void }) => {
+    const [selectedDay, setSelectedDay] = useState(1);
+    const [selectedPeriod, setSelectedPeriod] = useState<'morning' | 'afternoon'>('morning');
+    const [allPreferredOrders, setAllPreferredOrders] = useState<{ [day: number]: { morning?: { productName: string, quantity: number }[], afternoon?: { productName: string, quantity: number }[] } }>(company.preferredOrder || {});
+    const [hasChanges, setHasChanges] = useState(false);
+
+    useEffect(() => {
+        setAllPreferredOrders(company.preferredOrder || {});
+        setHasChanges(false);
+    }, [company]);
+
+    const days = [
+        { id: 1, name: 'Segunda' },
+        { id: 2, name: 'Terça' },
+        { id: 3, name: 'Quarta' },
+        { id: 4, name: 'Quinta' },
+        { id: 5, name: 'Sexta' },
+        { id: 6, name: 'Sábado' },
+        { id: 0, name: 'Domingo' },
+    ];
+
+    const currentDayConfig = allPreferredOrders[selectedDay] || {};
+    const currentItems = currentDayConfig[selectedPeriod] || [];
+
+    const handleAddItem = () => {
+        const updated = { ...allPreferredOrders };
+        if (!updated[selectedDay]) updated[selectedDay] = {};
+        updated[selectedDay][selectedPeriod] = [...currentItems, { productName: '', quantity: 1 }];
+        setAllPreferredOrders(updated);
+        setHasChanges(true);
+    };
+
+    const handleRemoveItem = (idx: number) => {
+        const updated = { ...allPreferredOrders };
+        if (!updated[selectedDay]) updated[selectedDay] = {};
+        updated[selectedDay][selectedPeriod] = currentItems.filter((_, i) => i !== idx);
+        setAllPreferredOrders(updated);
+        setHasChanges(true);
+    };
+
+    const handleItemChange = (idx: number, field: string, value: any) => {
+        const updatedItems = [...currentItems];
+        if (field === 'quantity') {
+            const val = Number(value);
+            (updatedItems[idx] as any)[field] = isNaN(val) || val < 1 ? 1 : val;
+        } else {
+            (updatedItems[idx] as any)[field] = value;
+        }
+        
+        const updated = { ...allPreferredOrders };
+        if (!updated[selectedDay]) updated[selectedDay] = {};
+        updated[selectedDay][selectedPeriod] = updatedItems;
+        setAllPreferredOrders(updated);
+        setHasChanges(true);
+    };
+
+    const handleSave = () => {
+        // Clean up empty items for all days and periods
+        const cleaned: { [day: number]: { morning?: { productName: string, quantity: number }[], afternoon?: { productName: string, quantity: number }[] } } = {};
+        Object.keys(allPreferredOrders).forEach(day => {
+            const d = Number(day);
+            const config = allPreferredOrders[d];
+            const morning = config.morning?.filter(it => it.productName !== '') || [];
+            const afternoon = config.afternoon?.filter(it => it.productName !== '') || [];
+            
+            if (morning.length > 0 || afternoon.length > 0) {
+                cleaned[d] = {};
+                if (morning.length > 0) cleaned[d].morning = morning;
+                if (afternoon.length > 0) cleaned[d].afternoon = afternoon;
+            }
+        });
+        onUpdate(cleaned);
+        setHasChanges(false);
+    };
+
+    const handleCancel = () => {
+        setAllPreferredOrders(company.preferredOrder || {});
+        setHasChanges(false);
+    };
+
+    // Filtra apenas produtos que o cliente compra
+    const validProducts = products.filter(p => 
+        company.productSettings?.some(s => s.productId === p.id && s.buys)
+    );
+
+    return (
+        <Card className="p-4 rounded-xl">
+            <div>
+                <h3 className="text-sm font-black text-amber-900 mb-1 uppercase tracking-tight">Pedido Preferido por Dia e Período</h3>
+                <p className="text-[10px] text-amber-600 mb-4">Defina os itens que este cliente costuma pedir para cada dia e período (Manhã/Tarde).</p>
+                
+                {/* Day Selector */}
+                <div className="flex gap-1 mb-4 bg-orange-50/50 p-1 rounded-lg">
+                    {days.map(day => (
+                        <button
+                            key={day.id}
+                            onClick={() => setSelectedDay(day.id)}
+                            className={`flex-1 py-2 text-[10px] font-black uppercase tracking-tighter rounded-md transition-all ${
+                                selectedDay === day.id 
+                                ? 'bg-orange-500 text-white shadow-sm' 
+                                : 'text-amber-700 hover:bg-orange-100/50'
+                            }`}
+                        >
+                            {day.name}
+                        </button>
+                    ))}
+                </div>
+
+                {/* Period Selector */}
+                <div className="flex gap-2 mb-6">
+                    <button
+                        onClick={() => setSelectedPeriod('morning')}
+                        className={`flex-1 py-2 text-[10px] font-black uppercase tracking-widest rounded-lg border transition-all ${
+                            selectedPeriod === 'morning'
+                            ? 'bg-amber-900 text-white border-amber-900 shadow-md'
+                            : 'bg-white text-amber-900 border-orange-100 hover:bg-orange-50'
+                        }`}
+                    >
+                        Manhã
+                    </button>
+                    <button
+                        onClick={() => setSelectedPeriod('afternoon')}
+                        className={`flex-1 py-2 text-[10px] font-black uppercase tracking-widest rounded-lg border transition-all ${
+                            selectedPeriod === 'afternoon'
+                            ? 'bg-amber-900 text-white border-amber-900 shadow-md'
+                            : 'bg-white text-amber-900 border-orange-100 hover:bg-orange-50'
+                        }`}
+                    >
+                        Tarde
+                    </button>
+                </div>
+
+                <div className="space-y-2 mb-4">
+                    {currentItems.map((item, idx) => (
+                        <div key={idx} className="flex gap-2 items-end bg-orange-50/20 p-2 rounded-lg border border-orange-100/30">
+                            <div className="flex-1">
+                                <label className="text-[8px] font-bold text-amber-500 uppercase ml-1 tracking-tighter">Produto</label>
+                                <select 
+                                    value={item.productName} 
+                                    onChange={e => handleItemChange(idx, 'productName', e.target.value)}
+                                    className="w-full bg-white border border-orange-100 rounded-md px-2 py-1 text-xs font-bold text-amber-900 outline-none focus:ring-1 focus:ring-orange-500"
+                                >
+                                    <option value="">Selecione...</option>
+                                    {validProducts.map(p => <option key={p.id} value={p.name}>{p.name}</option>)}
+                                </select>
+                            </div>
+                            <div className="w-20">
+                                <label className="text-[8px] font-bold text-amber-500 uppercase ml-1 tracking-tighter">Qtd</label>
+                                <input 
+                                    type="number" 
+                                    value={item.quantity} 
+                                    onChange={e => handleItemChange(idx, 'quantity', e.target.value)}
+                                    className="w-full bg-white border border-orange-100 rounded-md px-2 py-1 text-xs font-black text-center outline-none focus:ring-1 focus:ring-orange-500"
+                                />
+                            </div>
+                            <button onClick={() => handleRemoveItem(idx)} className="p-1.5 text-red-300 hover:text-red-500 transition-colors">
+                                <TrashIcon className="h-4 w-4" />
+                            </button>
+                        </div>
+                    ))}
+                    
+                    {currentItems.length === 0 && (
+                        <div className="text-center py-8 border-2 border-dashed border-orange-100 rounded-xl">
+                            <p className="text-[10px] font-bold text-amber-400 uppercase tracking-widest">
+                                Nenhum item para {days.find(d => d.id === selectedDay)?.name} ({selectedPeriod === 'morning' ? 'Manhã' : 'Tarde'})
+                            </p>
+                        </div>
+                    )}
+                </div>
+
+                <Button onClick={handleAddItem} variant="secondary" className="w-full py-2 border-dashed border-orange-200 text-[10px] mb-6">
+                    + Adicionar Produto ({selectedPeriod === 'morning' ? 'Manhã' : 'Tarde'})
+                </Button>
+
+                <div className="flex justify-end gap-2 border-t border-orange-100 pt-4">
+                    <Button type="button" variant="secondary" onClick={handleCancel} disabled={!hasChanges} className="text-[10px] px-3 py-1.5">
+                        Cancelar
+                    </Button>
+                    <Button type="button" onClick={handleSave} disabled={!hasChanges} className="text-[10px] px-3 py-1.5">
+                        Salvar Pedido Preferido
+                    </Button>
+                </div>
+            </div>
+        </Card>
+    );
 };
 
 // Sub-component for Product Settings Tab
@@ -246,9 +411,16 @@ const GeneralDataTab = ({ company, onUpdate }: { company: Company, onUpdate: (c:
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState(company);
   const [isLoadingCep, setIsLoadingCep] = useState(false);
+  const [isValidating, setIsValidating] = useState(false);
+  const [validationError, setValidationError] = useState<string | null>(null);
+  const [isCnpjValid, setIsCnpjValid] = useState<boolean | null>(null);
+  const [isCpfValid, setIsCpfValid] = useState<boolean | null>(null);
 
   useEffect(() => {
     setFormData(company);
+    setIsCnpjValid(null);
+    setIsCpfValid(null);
+    setValidationError(null);
   }, [company, isEditing]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -260,8 +432,16 @@ const GeneralDataTab = ({ company, onUpdate }: { company: Company, onUpdate: (c:
       return;
     }
 
-    if (name === 'cpf') maskedValue = maskCPF(value);
-    if (name === 'cnpj') maskedValue = maskCNPJ(value);
+    if (name === 'cpf') {
+      maskedValue = maskCPF(value);
+      setIsCpfValid(null);
+      setValidationError(null);
+    }
+    if (name === 'cnpj') {
+      maskedValue = maskCNPJ(value);
+      setIsCnpjValid(null);
+      setValidationError(null);
+    }
     if (name === 'phone') maskedValue = maskPhone(value);
     if (name === 'cep') maskedValue = maskCEP(value);
 
@@ -269,6 +449,47 @@ const GeneralDataTab = ({ company, onUpdate }: { company: Company, onUpdate: (c:
       ...prev, 
       [name]: maskedValue 
     }));
+  };
+
+  const handleCnpjBlur = async () => {
+    const cnpj = formData.cnpj.replace(/\D/g, '');
+    if (cnpj.length !== 14) return;
+    
+    if (!validateCNPJ(cnpj)) {
+      setIsCnpjValid(false);
+      setValidationError('CNPJ inválido');
+      return;
+    }
+
+    setIsValidating(true);
+    setValidationError(null);
+    try {
+      const response = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${cnpj}`);
+      if (response.ok) {
+        setIsCnpjValid(true);
+      } else {
+        setIsCnpjValid(false);
+        setValidationError('CNPJ não encontrado na base da Receita Federal');
+      }
+    } catch (error) {
+      console.error('Erro ao validar CNPJ:', error);
+      setIsCnpjValid(true);
+    } finally {
+      setIsValidating(false);
+    }
+  };
+
+  const handleCpfBlur = () => {
+    const cpf = formData.cpf.replace(/\D/g, '');
+    if (cpf.length !== 11) return;
+
+    if (validateCPF(cpf)) {
+      setIsCpfValid(true);
+      setValidationError(null);
+    } else {
+      setIsCpfValid(false);
+      setValidationError('CPF inválido');
+    }
   };
 
    const handleCepBlur = async (e: React.FocusEvent<HTMLInputElement>) => {
@@ -298,6 +519,21 @@ const GeneralDataTab = ({ company, onUpdate }: { company: Company, onUpdate: (c:
   };
 
   const handleSave = () => {
+    // Final validation before submitting
+    if (formData.type === 'PJ') {
+      const cnpj = formData.cnpj.replace(/\D/g, '');
+      if (!validateCNPJ(cnpj)) {
+        setValidationError('CNPJ inválido');
+        return;
+      }
+    } else {
+      const cpf = formData.cpf.replace(/\D/g, '');
+      if (!validateCPF(cpf)) {
+        setValidationError('CPF inválido');
+        return;
+      }
+    }
+
     onUpdate(formData);
     setIsEditing(false);
   };
@@ -353,9 +589,51 @@ const GeneralDataTab = ({ company, onUpdate }: { company: Company, onUpdate: (c:
             </div>
             <InfoField label="Nome do Cliente" value={formData.name} name="name" isEditing={isEditing} onChange={handleChange} />
             {formData.type === 'PJ' ? (
-                <InfoField label="CNPJ" value={formData.cnpj || ''} name="cnpj" isEditing={isEditing} onChange={handleChange} />
+                <div className="relative">
+                    <InfoField 
+                        label="CNPJ" 
+                        value={formData.cnpj || ''} 
+                        name="cnpj" 
+                        isEditing={isEditing} 
+                        onChange={handleChange} 
+                        onBlur={handleCnpjBlur}
+                        className={isCnpjValid === false ? 'border-red-500' : isCnpjValid === true ? 'border-green-500' : ''}
+                    />
+                    {isEditing && isValidating && (
+                        <div className="absolute right-3 top-[34px]">
+                            <div className="animate-spin h-4 w-4 border-2 border-orange-500 border-t-transparent rounded-full" />
+                        </div>
+                    )}
+                    {isEditing && isCnpjValid === true && !isValidating && (
+                        <CheckCircleIcon className="absolute right-3 top-[34px] h-4 w-4 text-green-500" />
+                    )}
+                    {isEditing && isCnpjValid === false && !isValidating && (
+                        <ExclamationCircleIcon className="absolute right-3 top-[34px] h-4 w-4 text-red-500" />
+                    )}
+                </div>
             ) : (
-                <InfoField label="CPF" value={formData.cpf || ''} name="cpf" isEditing={isEditing} onChange={handleChange} />
+                <div className="relative">
+                    <InfoField 
+                        label="CPF" 
+                        value={formData.cpf || ''} 
+                        name="cpf" 
+                        isEditing={isEditing} 
+                        onChange={handleChange} 
+                        onBlur={handleCpfBlur}
+                        className={isCpfValid === false ? 'border-red-500' : isCpfValid === true ? 'border-green-500' : ''}
+                    />
+                    {isEditing && isCpfValid === true && (
+                        <CheckCircleIcon className="absolute right-3 top-[34px] h-4 w-4 text-green-500" />
+                    )}
+                    {isEditing && isCpfValid === false && (
+                        <ExclamationCircleIcon className="absolute right-3 top-[34px] h-4 w-4 text-red-500" />
+                    )}
+                </div>
+            )}
+            {isEditing && validationError && (
+              <div className="md:col-span-2 -mt-2">
+                <p className="text-[10px] text-red-500 font-bold uppercase tracking-tight">{validationError}</p>
+              </div>
             )}
             <div className="grid grid-cols-12 gap-2 md:col-span-2">
               <div className="col-span-3">

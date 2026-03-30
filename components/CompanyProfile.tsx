@@ -4,8 +4,9 @@ import { Company } from '../types';
 import Card from './common/Card';
 import Input from './common/Input';
 import Button from './common/Button';
-import { TrashIcon, BuildingStorefrontIcon, PlusIcon, XMarkIcon, MagnifyingGlassIcon } from './Icons';
+import { TrashIcon, BuildingStorefrontIcon, PlusIcon, XMarkIcon, MagnifyingGlassIcon, CheckCircleIcon, ExclamationCircleIcon } from './Icons';
 import { maskCPF, maskCNPJ, maskPhone, maskCEP } from '../src/lib/masks';
+import { validateCPF, validateCNPJ } from '../src/lib/validations';
 
 // Modal Component - Minimalist Version
 const CompanyModal = ({ onSave, onClose }: { onSave: (company: Omit<Company, 'id' | 'orders'>) => void, onClose: () => void }) => {
@@ -24,10 +25,14 @@ const CompanyModal = ({ onSave, onClose }: { onSave: (company: Omit<Company, 'id
     phone: '',
     logoUrl: `https://picsum.photos/seed/${Date.now()}/200`,
     doorSale: false,
-    orderScheduling: true,
+    orderScheduling: false,
     emiteNF: false,
   });
   const [isLoadingCep, setIsLoadingCep] = useState(false);
+  const [isValidating, setIsValidating] = useState(false);
+  const [validationError, setValidationError] = useState<string | null>(null);
+  const [isCnpjValid, setIsCnpjValid] = useState<boolean | null>(null);
+  const [isCpfValid, setIsCpfValid] = useState<boolean | null>(null);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type, checked } = e.target;
@@ -38,8 +43,16 @@ const CompanyModal = ({ onSave, onClose }: { onSave: (company: Omit<Company, 'id
       return;
     }
 
-    if (name === 'cpf') maskedValue = maskCPF(value);
-    if (name === 'cnpj') maskedValue = maskCNPJ(value);
+    if (name === 'cpf') {
+      maskedValue = maskCPF(value);
+      setIsCpfValid(null);
+      setValidationError(null);
+    }
+    if (name === 'cnpj') {
+      maskedValue = maskCNPJ(value);
+      setIsCnpjValid(null);
+      setValidationError(null);
+    }
     if (name === 'phone') maskedValue = maskPhone(value);
     if (name === 'cep') maskedValue = maskCEP(value);
 
@@ -47,6 +60,62 @@ const CompanyModal = ({ onSave, onClose }: { onSave: (company: Omit<Company, 'id
       ...prev, 
       [name]: maskedValue 
     }));
+  };
+
+  const handleCnpjBlur = async () => {
+    const cnpj = formData.cnpj.replace(/\D/g, '');
+    if (cnpj.length !== 14) return;
+    
+    if (!validateCNPJ(cnpj)) {
+      setIsCnpjValid(false);
+      setValidationError('CNPJ inválido (Dígitos verificadores incorretos)');
+      return;
+    }
+
+    setIsValidating(true);
+    setValidationError(null);
+    try {
+      const response = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${cnpj}`);
+      if (response.ok) {
+        const data = await response.json();
+        setIsCnpjValid(true);
+        // Opcional: Auto-preencher dados se for um novo cadastro
+        if (!formData.name) {
+          setFormData(prev => ({
+            ...prev,
+            name: data.razao_social || data.nome_fantasia || prev.name,
+            address: data.logradouro || prev.address,
+            number: data.numero || prev.number,
+            bairro: data.bairro || prev.bairro,
+            cep: data.cep || prev.cep,
+            municipio: data.municipio || prev.municipio,
+            uf: data.uf || prev.uf,
+          }));
+        }
+      } else {
+        setIsCnpjValid(false);
+        setValidationError('CNPJ não encontrado na base da Receita Federal');
+      }
+    } catch (error) {
+      console.error('Erro ao validar CNPJ:', error);
+      // Se a API falhar, aceitamos apenas pelo checksum para não bloquear o usuário
+      setIsCnpjValid(true);
+    } finally {
+      setIsValidating(false);
+    }
+  };
+
+  const handleCpfBlur = () => {
+    const cpf = formData.cpf.replace(/\D/g, '');
+    if (cpf.length !== 11) return;
+
+    if (validateCPF(cpf)) {
+      setIsCpfValid(true);
+      setValidationError(null);
+    } else {
+      setIsCpfValid(false);
+      setValidationError('CPF inválido');
+    }
   };
 
   const handleCepBlur = async (e: React.FocusEvent<HTMLInputElement>) => {
@@ -72,8 +141,24 @@ const CompanyModal = ({ onSave, onClose }: { onSave: (company: Omit<Company, 'id
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Final validation before submitting
+    if (formData.type === 'PJ') {
+      const cnpj = formData.cnpj.replace(/\D/g, '');
+      if (!validateCNPJ(cnpj)) {
+        setValidationError('CNPJ inválido');
+        return;
+      }
+    } else {
+      const cpf = formData.cpf.replace(/\D/g, '');
+      if (!validateCPF(cpf)) {
+        setValidationError('CPF inválido');
+        return;
+      }
+    }
+
     onSave(formData);
   };
 
@@ -114,12 +199,52 @@ const CompanyModal = ({ onSave, onClose }: { onSave: (company: Omit<Company, 'id
             <Input label="Nome do Cliente" name="name" value={formData.name} onChange={handleChange} required />
             <div className="grid grid-cols-2 gap-4">
               {formData.type === 'PJ' ? (
-                <Input label="CNPJ" name="cnpj" value={formData.cnpj} onChange={handleChange} required />
+                <div className="relative">
+                  <Input 
+                    label="CNPJ" 
+                    name="cnpj" 
+                    value={formData.cnpj} 
+                    onChange={handleChange} 
+                    onBlur={handleCnpjBlur}
+                    required 
+                    className={isCnpjValid === false ? 'border-red-500' : isCnpjValid === true ? 'border-green-500' : ''}
+                  />
+                  {isValidating && (
+                    <div className="absolute right-3 top-[34px]">
+                      <div className="animate-spin h-4 w-4 border-2 border-orange-500 border-t-transparent rounded-full" />
+                    </div>
+                  )}
+                  {isCnpjValid === true && !isValidating && (
+                    <CheckCircleIcon className="absolute right-3 top-[34px] h-4 w-4 text-green-500" />
+                  )}
+                  {isCnpjValid === false && !isValidating && (
+                    <ExclamationCircleIcon className="absolute right-3 top-[34px] h-4 w-4 text-red-500" />
+                  )}
+                </div>
               ) : (
-                <Input label="CPF" name="cpf" value={formData.cpf} onChange={handleChange} required />
+                <div className="relative">
+                  <Input 
+                    label="CPF" 
+                    name="cpf" 
+                    value={formData.cpf} 
+                    onChange={handleChange} 
+                    onBlur={handleCpfBlur}
+                    required 
+                    className={isCpfValid === false ? 'border-red-500' : isCpfValid === true ? 'border-green-500' : ''}
+                  />
+                  {isCpfValid === true && (
+                    <CheckCircleIcon className="absolute right-3 top-[34px] h-4 w-4 text-green-500" />
+                  )}
+                  {isCpfValid === false && (
+                    <ExclamationCircleIcon className="absolute right-3 top-[34px] h-4 w-4 text-red-500" />
+                  )}
+                </div>
               )}
               <Input label="Telefone" name="phone" value={formData.phone} onChange={handleChange} required />
             </div>
+            {validationError && (
+              <p className="text-[10px] text-red-500 font-bold uppercase tracking-tight -mt-2">{validationError}</p>
+            )}
             <div className="grid grid-cols-12 gap-4">
               <div className="col-span-3">
                 <Input label="CEP" name="cep" value={formData.cep} onChange={handleChange} onBlur={handleCepBlur} required />
@@ -264,7 +389,7 @@ const CompanyManagement: React.FC<CompanyManagementProps> = ({ companies, onAdd,
                       <div className="flex gap-1">
                         <span className="text-[7px] bg-amber-50 text-amber-600 px-1 py-0.5 rounded font-bold uppercase border border-amber-100">{company.type || 'PJ'}</span>
                         {company.doorSale && <span className="text-[7px] bg-green-50 text-green-600 px-1 py-0.5 rounded font-bold uppercase border border-green-100">Porta</span>}
-                        {company.orderScheduling && <span className="text-[7px] bg-blue-50 text-blue-600 px-1 py-0.5 rounded font-bold uppercase border border-blue-100">Agenda</span>}
+                        {company.orderScheduling && <span className="text-[7px] bg-blue-50 text-blue-600 px-1 py-0.5 rounded font-bold uppercase border border-blue-100">Agendamento</span>}
                       </div>
                   </div>
                   <p className="text-[9px] text-gray-400 font-medium uppercase tracking-tighter">

@@ -38,6 +38,7 @@ export interface Order {
   buyerSignatureTime?: string; // ISO string
   status?: 'pending' | 'confirmed';
   isDoorSale?: boolean; // Novo campo para identificar vendas na porta
+  period?: 'morning' | 'afternoon'; // Novo campo para identificar o período do pedido
 }
 
 export interface CompanyProductSetting {
@@ -84,6 +85,12 @@ export interface Company {
   doorSale?: boolean;
   orderScheduling?: boolean; // Novo campo
   recurringOrder?: RecurringOrderConfig;
+  preferredOrder?: { 
+    [day: number]: { 
+      morning?: { productName: string; quantity: number }[]; 
+      afternoon?: { productName: string; quantity: number }[]; 
+    } 
+  };
   emiteNF?: boolean;
 }
 

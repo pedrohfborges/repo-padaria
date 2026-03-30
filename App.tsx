@@ -11,7 +11,7 @@ import CompanyDetailView from './components/CompanyDetailView';
 import ScheduledConfirmation from './components/ScheduledConfirmation';
 import { DocumentTextIcon, ChartBarIcon, ArchiveBoxIcon } from './components/Icons';
 
-type View = 'companies' | 'orders' | 'door-sales' | 'products' | 'scheduled-confirmation' | 'manual-order' | 'invoices' | 'reports' | 'inventory';
+type View = 'companies' | 'orders' | 'door-sales' | 'products' | 'scheduled-confirmation' | 'manual-order' | 'invoices' | 'reports' | 'inventory' | 'scheduled-confirmation-morning' | 'scheduled-confirmation-afternoon';
 
 /**
  * ==============================================================================
@@ -43,6 +43,18 @@ const saveToLocalStorage = <T,>(key: string, value: T) => {
     try { localStorage.setItem(key, JSON.stringify(value)); } catch (error) { console.error(`Error saving ${key}`, error); }
 };
 
+const initialProducts: Product[] = [
+    { id: 'prod-1', name: 'Pão Francês', category: 'Pães' },
+    { id: 'prod-2', name: 'Pão de Queijo', category: 'Pães' },
+    { id: 'prod-3', name: 'Bolo de Cenoura', category: 'Bolos' }
+];
+
+const getTomorrowDay = () => {
+  const d = new Date();
+  d.setDate(d.getDate() + 1);
+  return d.getDay();
+};
+
 const initialCompanies: Company[] = [
     {
       id: '1',
@@ -54,11 +66,18 @@ const initialCompanies: Company[] = [
       phone: '(11)98765-4321',
       logoUrl: 'https://picsum.photos/seed/bakerylogo/200',
       doorSale: true,
+      orderScheduling: true,
       orders: [],
       productSettings: [
         { productId: 'prod-1', buys: true, price: 0.75 },
         { productId: 'prod-2', buys: true, price: 5.50 }
-      ]
+      ],
+      preferredOrder: {
+        [getTomorrowDay()]: {
+          morning: [{ productName: 'Pão Francês', quantity: 50 }],
+          afternoon: [{ productName: 'Pão de Queijo', quantity: 20 }]
+        }
+      }
     }
 ];
 
@@ -70,7 +89,7 @@ const App: React.FC = () => {
     return [...loaded].sort((a, b) => a.name.localeCompare(b.name));
   });
   const [products, setProducts] = useState<Product[]>(() => {
-    const loaded = loadFromLocalStorage('products', []);
+    const loaded = loadFromLocalStorage('products', initialProducts);
     return [...loaded].sort((a, b) => a.name.localeCompare(b.name));
   });
   const [selectedCompanyId, setSelectedCompanyId] = useState<string | null>(null);
@@ -110,9 +129,8 @@ const App: React.FC = () => {
       return updated;
     });
     
-    // Feedback de sucesso
-    const total = data.drafts.length + data.existing.length;
-    alert(`Sucesso! ${total} pedido(s) foram confirmados e enviados para o histórico.`);
+    // Feedback de sucesso removido (alert não funciona em iframe)
+    console.log(`${data.drafts.length + data.existing.length} pedido(s) confirmados.`);
   };
 
   const handleUpdateRecurringOrder = (companyId: string, config: RecurringOrderConfig) => {
@@ -203,6 +221,8 @@ const App: React.FC = () => {
     switch (currentView) {
       case 'companies': return <CompanyManagement companies={companies} onAdd={handleAddCompany} onUpdate={handleUpdateCompany} onDelete={handleDeleteCompany} onViewCompany={setViewingCompanyId} />;
       case 'scheduled-confirmation': return <ScheduledConfirmation companies={companies} products={products} onConfirmAllQueue={handleConfirmAllQueue} onDeleteOrder={handleDeleteOrder} onAddManualOrder={handleAddOrder} />;
+      case 'scheduled-confirmation-morning': return <ScheduledConfirmation companies={companies} products={products} onConfirmAllQueue={handleConfirmAllQueue} onDeleteOrder={handleDeleteOrder} onAddManualOrder={handleAddOrder} period="morning" />;
+      case 'scheduled-confirmation-afternoon': return <ScheduledConfirmation companies={companies} products={products} onConfirmAllQueue={handleConfirmAllQueue} onDeleteOrder={handleDeleteOrder} onAddManualOrder={handleAddOrder} period="afternoon" />;
       case 'manual-order': return <OrderManagement companies={companies} selectedCompany={selectedCompany} products={products} onSelectCompany={setSelectedCompanyId} onAddOrder={handleAddOrder} onDeleteOrder={(id) => handleDeleteOrder(id)} onUpdateOrderSignature={handleUpdateOrderSignature} isDoorSaleMode={false} isManualLaunchMode={true} />;
       case 'orders': return <OrderManagement companies={companies} selectedCompany={selectedCompany} products={products} onSelectCompany={setSelectedCompanyId} onAddOrder={handleAddOrder} onDeleteOrder={(id) => handleDeleteOrder(id)} onUpdateOrderSignature={handleUpdateOrderSignature} isDoorSaleMode={false} />;
       case 'door-sales': return <OrderManagement companies={companies.filter(c => c.doorSale)} selectedCompany={selectedCompany} products={products} onSelectCompany={setSelectedCompanyId} onAddOrder={handleAddOrder} onDeleteOrder={(id) => handleDeleteOrder(id)} onUpdateOrderSignature={handleUpdateOrderSignature} isDoorSaleMode={true} />;
@@ -219,6 +239,8 @@ const App: React.FC = () => {
   const headerInfo = {
     companies: { icon: <BuildingStorefrontIcon className="h-5 w-5 text-orange-500" />, title: 'Cadastro de cliente', subtitle: 'Gestão de clientes e parceiros.' },
     'scheduled-confirmation': { icon: <CheckCircleIcon className="h-5 w-5 text-orange-500" />, title: 'Produção', subtitle: 'Confirmar pedidos com Recorrência.' },
+    'scheduled-confirmation-morning': { icon: <CheckCircleIcon className="h-5 w-5 text-orange-500" />, title: 'Produção - Manhã', subtitle: 'Pedidos agendados para a manhã.' },
+    'scheduled-confirmation-afternoon': { icon: <CheckCircleIcon className="h-5 w-5 text-orange-500" />, title: 'Produção - Tarde', subtitle: 'Pedidos agendados para a tarde.' },
     'manual-order': { icon: <PlusIcon className="h-5 w-5 text-orange-500" />, title: 'Pedido Manual', subtitle: 'Lançamento imediato de pedidos.' },
     orders: { icon: <ClipboardDocumentListIcon className="h-5 w-5 text-orange-500" />, title: 'Histórico', subtitle: 'Registro de pedidos realizados.' },
     'door-sales': { icon: <ShoppingBagIcon className="h-5 w-5 text-orange-500" />, title: 'Venda na Porta', subtitle: 'Pedidos específicos de balcão.' },

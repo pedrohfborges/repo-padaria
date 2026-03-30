@@ -111,8 +111,32 @@ const SignatureModal = ({ title, onSave, onClose }: { title: string, onSave: (si
 };
 
 // Modal para Novo Pedido
-const AddOrderModal = ({ products, companySettings, onSave, onClose, isDoorSaleMode }: { products: Product[], companySettings: CompanyProductSetting[], onSave: (items: Omit<OrderItem, 'id'>[]) => void, onClose: () => void, isDoorSaleMode?: boolean }) => {
+const AddOrderModal = ({ products, companySettings, preferredOrder, onSave, onClose, isDoorSaleMode }: { 
+  products: Product[], 
+  companySettings: CompanyProductSetting[], 
+  preferredOrder?: { 
+    [day: number]: { 
+      morning?: { productName: string, quantity: number }[], 
+      afternoon?: { productName: string, quantity: number }[] 
+    } 
+  }, 
+  onSave: (items: Omit<OrderItem, 'id'>[]) => void, 
+  onClose: () => void, 
+  isDoorSaleMode?: boolean 
+}) => {
   const [items, setItems] = useState<Omit<OrderItem, 'id' | 'price'>[]>([{ productName: '', quantity: 1 }]);
+
+  const handleLoadPreferred = (period: 'morning' | 'afternoon') => {
+    if (preferredOrder) {
+      const today = new Date().getDay();
+      const dayConfig = preferredOrder[today];
+      const periodItems = dayConfig?.[period];
+      
+      if (periodItems && periodItems.length > 0) {
+        setItems(periodItems.map(it => ({ productName: it.productName, quantity: it.quantity })));
+      }
+    }
+  };
 
   // Filtra apenas produtos que o cliente compra e tem preço > 0
   const validProducts = products.filter(p => {
@@ -213,9 +237,21 @@ const AddOrderModal = ({ products, companySettings, onSave, onClose, isDoorSaleM
 
         {validProducts.length > 0 && (
           <>
-            <button onClick={handleAddItem} className="w-full py-1.5 border border-dashed border-orange-200 rounded-lg text-[9px] font-black text-orange-500 uppercase hover:bg-orange-50 transition-all mb-4 tracking-widest">
-              + Adicionar Item
-            </button>
+            <div className="flex gap-1 mb-4">
+              <button onClick={handleAddItem} className="flex-1 py-1.5 border border-dashed border-orange-200 rounded-lg text-[8px] font-black text-orange-500 uppercase hover:bg-orange-50 transition-all tracking-widest">
+                + Item
+              </button>
+              {preferredOrder && preferredOrder[new Date().getDay()]?.morning && (
+                <button onClick={() => handleLoadPreferred('morning')} className="flex-1 py-1.5 bg-orange-50 border border-orange-200 rounded-lg text-[8px] font-black text-orange-600 uppercase hover:bg-orange-100 transition-all tracking-widest">
+                  Pref. Manhã
+                </button>
+              )}
+              {preferredOrder && preferredOrder[new Date().getDay()]?.afternoon && (
+                <button onClick={() => handleLoadPreferred('afternoon')} className="flex-1 py-1.5 bg-orange-50 border border-orange-200 rounded-lg text-[8px] font-black text-orange-600 uppercase hover:bg-orange-100 transition-all tracking-widest">
+                  Pref. Tarde
+                </button>
+              )}
+            </div>
 
             {!isDoorSaleMode && (
               <div className="mb-4 p-2 bg-amber-50 rounded-lg border border-amber-100 flex justify-between items-center">
@@ -300,6 +336,7 @@ const OrderManagement: React.FC<OrderManagementProps> = ({
         <AddOrderModal 
           products={products} 
           companySettings={selectedCompany?.productSettings || []}
+          preferredOrder={selectedCompany?.preferredOrder}
           onSave={handleSaveOrder} 
           onClose={() => setIsAdding(false)} 
           isDoorSaleMode={isDoorSaleMode}
